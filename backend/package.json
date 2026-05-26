@@ -1,10 +1,12 @@
 {
   "name": "backend-movie",
   "version": "1.0.0",
-  "description": "Backend Smart Movie Recommendation",
+  "type": "module",
+  "description": "Backend Smart Movie Recommendation - Clean Architecture",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "dev": "node --watch app.js"
   },
   "author": "",
   "license": "ISC",

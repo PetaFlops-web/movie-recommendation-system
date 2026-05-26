@@ -1,44 +1,50 @@
-const express = require("express");
-const cors = require("cors");
+import express from "express";
+import cors from "cors";
+import recommendationRoutes from "./src/routes/recommendation.routes.js";
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-// route utama
 app.get("/", (req, res) => {
-  res.send("Welcome to App Smart Movie Recommendation");
+  res.json({
+    name: "Smart Movie Recommendation API",
+    version: "1.0.0",
+    description:
+      "Backend API for Content-Based, NCF, and Hybrid Movie Recommendations",
+    endpoints: {
+      health: "GET /api/v1/health",
+      movies: "GET /api/v1/movies?page=1&limit=20&search=...",
+      users: "GET /api/v1/users",
+      content_based:
+        "GET /api/v1/recommendations/content-based?title=...&top_n=10",
+      ncf: "GET /api/v1/recommendations/ncf?username=...&top_n=10&exclude_seen=true",
+      hybrid_onboarding: "POST /api/v1/recommendations/hybrid-onboarding",
+    },
+  });
 });
 
-// API sederhana (buat checkpoint)
-app.get("/api/movies", (req, res) => {
-  const movies = [
-    { id: 1, title: "Avengers", genre: "Action" },
-    { id: 2, title: "Titanic", genre: "Romance" },
-    { id: 3, title: "Conjuring", genre: "Horror" }
-  ];
+app.use("/api/v1", recommendationRoutes);
 
-  res.json(movies);
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.method} ${req.originalUrl} not found`,
+  });
 });
 
-// API
-app.get("/api/recommend", (req, res) => {
-  const { genre } = req.query;
-
-  const movies = [
-    { title: "Avengers", genre: "Action" },
-    { title: "Titanic", genre: "Romance" },
-    { title: "Conjuring", genre: "Horror" }
-  ];
-
-  const result = movies.filter(m =>
-    m.genre.toLowerCase().includes(genre?.toLowerCase())
-  );
-
-  res.json(result);
+app.use((err, req, res, _next) => {
+  console.error("[GlobalError]", err.stack);
+  res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server jalan di http://localhost:${PORT}`);
+  console.log(
+    `\n[START] Node.js API Server running on http://localhost:${PORT}`,
+  );
 });
