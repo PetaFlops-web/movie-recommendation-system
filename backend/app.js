@@ -1,50 +1,115 @@
-import express from "express";
-import cors from "cors";
-import recommendationRoutes from "./src/routes/recommendation.routes.js";
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const path = require('path');
+
+// Import konfigurasi & routes
+const { initDB } = require('./config/database');
+const authRoutes = require('./routes/auth');
+const movieRoutes = require('./routes/movies');
+const mlService = require('./services/mlService');
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// === 🔒 SECURITY & CORS MIDDLEWARE ===
+app.use(helmet()); // Melindungi header HTTP dari vulnerability umum
 
-app.get("/", (req, res) => {
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// === 📦 BODY PARSING ===
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// === 📝 LOGGING ===
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev')); // Format ringkas untuk development
+} else {
+  app.use(morgan('combined')); // Format lengkap untuk production
+}
+
+// === 🗄️ DATABASE INITIALIZATION ===
+// Membuat tabel otomatis saat server startup (jika belum ada)
+initDB()
+  .then(() => console.log('✅ Database connection pool ready'))
+  .catch(err => console.error('❌ DB Initialization failed:', err));
+
+// === 🛣️ ROUTES MOUNTING ===
+// Autentikasi & Preferensi User
+app.use('/api/auth', authRoutes);
+
+// Film, Pencarian, Detail & Top 10 Rekomendasi (Content-Based)
+app.use('/api/movies', movieRoutes);
+
+// === 🏠 ROOT ENDPOINT ===
+app.get('/', (req, res) => {
   res.json({
-    name: "Smart Movie Recommendation API",
-    version: "1.0.0",
-    description:
-      "Backend API for Content-Based, NCF, and Hybrid Movie Recommendations",
+    message: '🎬 Smart Movie Recommendation System API',
+    project: 'PJK-GM059 | IBM SkillsBuild Capstone',
+    version: '1.0.0',
     endpoints: {
-      health: "GET /api/v1/health",
-      movies: "GET /api/v1/movies?page=1&limit=20&search=...",
-      users: "GET /api/v1/users",
-      content_based:
-        "GET /api/v1/recommendations/content-based?title=...&top_n=10",
-      ncf: "GET /api/v1/recommendations/ncf?username=...&top_n=10&exclude_seen=true",
-      hybrid_onboarding: "POST /api/v1/recommendations/hybrid-onboarding",
-    },
+      auth: {
+        register: 'POST /api/auth/register',
+        login: 'POST /api/auth/login',
+        preferences: 'POST /api/auth/preferences | GET /api/auth/preferences'
+      },
+      movies: {
+        list: 'GET /api/movies?page=1&limit=20&search=action',
+        detail: 'GET /api/movies/:id (returns movie detail + Top 10 recommendations)'
+      },
+      health: 'GET /api/health'
+    }
   });
 });
 
-app.use("/api/v1", recommendationRoutes);
+// === 🏥 HEALTH CHECK ===
+app.get('/api/health', async (req, res) => {
+  try {
+    const mlStatus = await mlService.healthCheck();
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      service: 'Smart Movie Recommendation Backend',
+      database: 'PostgreSQL',
+      ml_service: mlStatus,
+      team: 'PJK-GM059'
+    });
+  } catch (err) {
+    // Tetap return 200 agar monitoring tidak panic, tapi kasih tau status ML
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      service: 'Smart Movie Recommendation Backend',
+      database: 'PostgreSQL',
+      ml_service: { status: 'unreachable', note: 'Python ML service might be down' },
+      team: 'PJK-GM059'
+    });
+  }
+});
 
+// ===  404 HANDLER ===
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.method} ${req.originalUrl} not found`,
+    message: 'Endpoint tidak ditemukan',
+    path: `${req.method} ${req.originalUrl}`
   });
 });
 
-app.use((err, req, res, _next) => {
-  console.error("[GlobalError]", err.stack);
-  res.status(500).json({
+// === 💥 GLOBAL ERROR HANDLER ===
+app.use((err, req, res, next) => {
+  console.error('💥 Server Error:', err);
+  res.status(err.status || 500).json({
     success: false,
-    message: "Internal Server Error",
+    message: err.message || 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(
-    `\n[START] Node.js API Server running on http://localhost:${PORT}`,
-  );
-});
+module.exports = app;

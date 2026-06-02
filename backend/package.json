@@ -1,17 +1,44 @@
 {
-  "name": "backend-movie",
+  "name": "smart-movie-recommendation-backend",
   "version": "1.0.0",
-  "type": "module",
-  "description": "Backend Smart Movie Recommendation - Clean Architecture",
-  "main": "app.js",
+  "description": "Backend for Smart Movie Recommendation System - PJK-GM059 Capstone Project",
+  "main": "server.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "node --watch app.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "import-movies": "node scripts/importMovies.js",
+    "python-service": "cd python_service && python inference_server.py",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "movie",
+    "recommendation",
+    "machine-learning",
+    "backend",
+    "postgresql",
+    "pjk-gm059",
+    "nodejs"
+  ],
+  "author": "Wandi Filemon Hotmartua Sianturi (Team PJK-GM059)",
+  "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "axios": "^1.6.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.0.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
