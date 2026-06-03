@@ -1,0 +1,9 @@
+node_modules/
+.env
+database.sqlite
+*.log
+.DS_Store
+python_service/__pycache__/
+model/*.pkl
+model/*.keras
+model/*.csv
