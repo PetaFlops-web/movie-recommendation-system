@@ -3,27 +3,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, 
-  Film, 
-  TrendingUp, 
-  Star, 
-  ArrowRight, 
+import {
+  Search,
+  Film,
+  TrendingUp,
+  Star,
+  ArrowRight,
   Sparkles,
   Clock,
   Globe,
   ChevronRight,
-  Loader2,
   AlertCircle,
-  X
+  X,
 } from 'lucide-react';
-import { 
-  fetchMovies, 
-  type MovieFromAPI, 
-  formatIMDBScore, 
-  formatRuntime, 
-  parseGenres, 
-  encodeMovieTitle 
+import {
+  fetchMovies,
+  type MovieFromAPI,
+  formatIMDBScore,
+  formatRuntime,
+  parseGenres,
+  encodeMovieTitle,
 } from './lib/api';
 
 // ============================================================
@@ -39,12 +38,12 @@ function useDebounce(value: string, delay: number) {
 }
 
 // ============================================================
-// Genre list (from common Netflix genres)
+// Genre list
 // ============================================================
 const GENRE_LIST = [
   'Drama', 'Comedy', 'Documentary', 'Thriller', 'Romance',
   'Action', 'Horror', 'Crime', 'Animation', 'Sci-Fi',
-  'Mystery', 'Family', 'Adventure', 'Fantasy'
+  'Mystery', 'Family', 'Adventure', 'Fantasy',
 ];
 
 // ============================================================
@@ -53,6 +52,7 @@ const GENRE_LIST = [
 function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
   const genres = parseGenres(movie.genre);
   const score = movie.imdb_score;
+  const runtimeDisplay = movie.runtime ? formatRuntime(Number(movie.runtime) || null) : '';
 
   return (
     <motion.div
@@ -62,13 +62,13 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
     >
       <Link href={`/movie/${encodeMovieTitle(movie.title)}`}>
         <div className="movie-card glass-panel rounded-2xl p-5 border border-white/5 cursor-pointer group h-full flex flex-col justify-between min-h-[220px]">
-          {/* Top: Genre tags + Rating */}
+          {/* Top */}
           <div>
             <div className="flex items-start justify-between mb-3">
               <div className="flex flex-wrap gap-1.5">
-                {genres.slice(0, 2).map(g => (
-                  <span 
-                    key={g} 
+                {genres.slice(0, 2).map((g) => (
+                  <span
+                    key={g}
                     className="px-2 py-0.5 rounded-full text-[10px] font-bold text-brand-200 bg-brand-300/10 border border-brand-300/20"
                   >
                     {g}
@@ -83,12 +83,10 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
               )}
             </div>
 
-            {/* Title */}
             <h3 className="text-base font-bold text-white group-hover:text-brand-300 transition-colors leading-tight mb-2 line-clamp-2">
               {movie.title}
             </h3>
 
-            {/* Meta info */}
             <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">
               {movie.year && (
                 <span className="flex items-center gap-1">
@@ -96,10 +94,10 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
                   {movie.year}
                 </span>
               )}
-              {movie.runtime && (
+              {runtimeDisplay && (
                 <>
                   <span className="w-1 h-1 rounded-full bg-slate-600" />
-                  <span>{formatRuntime(movie.runtime)}</span>
+                  <span>{runtimeDisplay}</span>
                 </>
               )}
               {movie.language && movie.language !== 'nan' && (
@@ -114,7 +112,7 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
             </div>
           </div>
 
-          {/* Bottom: CTA */}
+          {/* Bottom */}
           <div className="pt-3 mt-4 border-t border-white/5 flex items-center justify-between">
             <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
               {genres.join(' • ')}
@@ -152,7 +150,6 @@ function SkeletonCard() {
 // Main Home Page
 // ============================================================
 export default function Home() {
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MovieFromAPI[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -160,25 +157,21 @@ export default function Home() {
   const searchRef = useRef<HTMLDivElement>(null);
   const debouncedSearch = useDebounce(searchQuery, 400);
 
-  // Popular movies
   const [popularMovies, setPopularMovies] = useState<MovieFromAPI[]>([]);
   const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [popularPage, setPopularPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Trending (top rated)
   const [trendingMovies, setTrendingMovies] = useState<MovieFromAPI[]>([]);
   const [isLoadingTrending, setIsLoadingTrending] = useState(true);
 
-  // Genre filter
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [genreMovies, setGenreMovies] = useState<MovieFromAPI[]>([]);
   const [isLoadingGenre, setIsLoadingGenre] = useState(false);
 
-  // Error state
   const [error, setError] = useState<string | null>(null);
 
-  // ---- Load Popular Movies ----
+  // ---- Load Popular ----
   const loadPopularMovies = useCallback(async (page: number) => {
     setIsLoadingPopular(true);
     setError(null);
@@ -194,24 +187,24 @@ export default function Home() {
     }
   }, []);
 
-  // ---- Load Trending Movies (top IMDB) ----
+  // ---- Load Trending ----
   const loadTrendingMovies = useCallback(async () => {
     setIsLoadingTrending(true);
     try {
       const data = await fetchMovies(1, 100);
       const sorted = [...data.movies]
-        .filter(m => m.imdb_score > 0)
+        .filter((m) => m.imdb_score > 0)
         .sort((a, b) => b.imdb_score - a.imdb_score)
         .slice(0, 10);
       setTrendingMovies(sorted);
     } catch {
-      // Trending is non-critical, silently fail
+      // silent fail
     } finally {
       setIsLoadingTrending(false);
     }
   }, []);
 
-  // ---- Initial load ----
+  // ---- Init ----
   useEffect(() => {
     loadPopularMovies(1);
     loadTrendingMovies();
@@ -224,7 +217,6 @@ export default function Home() {
       setShowSearchResults(false);
       return;
     }
-
     const doSearch = async () => {
       setIsSearching(true);
       setShowSearchResults(true);
@@ -246,7 +238,6 @@ export default function Home() {
       setGenreMovies([]);
       return;
     }
-
     const loadGenre = async () => {
       setIsLoadingGenre(true);
       try {
@@ -261,7 +252,7 @@ export default function Home() {
     loadGenre();
   }, [selectedGenre]);
 
-  // ---- Close search dropdown on outside click ----
+  // ---- Outside click ----
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -274,8 +265,7 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen z-10 selection:bg-brand-300/30 selection:text-brand-50">
-      
-      {/* Background Atmosphere */}
+      {/* Background */}
       <div className="cinematic-bg">
         <div className="glow-orb glow-orb-primary" />
         <div className="glow-orb glow-orb-secondary" />
@@ -284,12 +274,9 @@ export default function Home() {
         <div className="neon-grid" />
       </div>
 
-      {/* ============================================================ */}
-      {/* HEADER / NAVBAR */}
-      {/* ============================================================ */}
+      {/* HEADER */}
       <header className="sticky top-0 z-50 w-full glass-panel border-b border-white/5 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
-          {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-300 to-brand-200 flex items-center justify-center shadow-lg shadow-brand-300/20">
               <Film className="w-5 h-5 text-white" />
@@ -303,21 +290,13 @@ export default function Home() {
               </span>
             </div>
           </div>
-
-
         </div>
       </header>
 
-      {/* ============================================================ */}
-      {/* MAIN CONTENT */}
-      {/* ============================================================ */}
+      {/* MAIN */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24">
-
-        {/* ============================================================ */}
-        {/* HERO SECTION */}
-        {/* ============================================================ */}
+        {/* HERO */}
         <section className="pt-8 sm:pt-12 lg:pt-16 pb-12 text-center">
-          {/* Badge */}
           <div className="flex justify-center mb-6">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-300/10 border border-brand-300/20 text-xs text-brand-200 backdrop-blur-md">
               <span className="flex h-2 w-2 relative">
@@ -328,22 +307,17 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Headline */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-white mb-6">
             Temukan Film <br className="hidden sm:inline" />
-            <span className="gradient-text-blue">
-              Favoritmu
-            </span>
+            <span className="gradient-text-blue">Favoritmu</span>
           </h1>
 
           <p className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed font-light">
-            Cari film yang kamu suka, lalu dapatkan rekomendasi film serupa berdasarkan 
-            kemiripan genre, sinopsis, dan karakteristik konten lainnya.
+            Cari film yang kamu suka, lalu dapatkan rekomendasi film serupa berdasarkan kemiripan genre, sinopsis, dan
+            karakteristik konten lainnya.
           </p>
 
-          {/* ============================================================ */}
-          {/* SEARCH BAR */}
-          {/* ============================================================ */}
+          {/* SEARCH */}
           <div ref={searchRef} className="relative max-w-2xl mx-auto mb-12">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-300/60" />
@@ -353,12 +327,17 @@ export default function Home() {
                 placeholder="Cari judul film..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
+                onFocus={() => {
+                  if (searchResults.length > 0) setShowSearchResults(true);
+                }}
                 className="search-input w-full pl-12 pr-12 py-4 rounded-2xl text-white text-base placeholder:text-slate-500 font-medium"
               />
               {searchQuery && (
-                <button 
-                  onClick={() => { setSearchQuery(''); setShowSearchResults(false); }}
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowSearchResults(false);
+                  }}
                   className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
                 >
                   <X className="w-3.5 h-3.5 text-slate-400" />
@@ -371,7 +350,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* Search Results Dropdown */}
+            {/* Dropdown */}
             <AnimatePresence>
               {showSearchResults && searchQuery.trim() && (
                 <motion.div
@@ -389,12 +368,14 @@ export default function Home() {
                   ) : searchResults.length === 0 ? (
                     <div className="p-6 text-center">
                       <AlertCircle className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                      <p className="text-sm text-slate-400">Film tidak ditemukan untuk &ldquo;{searchQuery}&rdquo;</p>
+                      <p className="text-sm text-slate-400">
+                        Film tidak ditemukan untuk &ldquo;{searchQuery}&rdquo;
+                      </p>
                     </div>
                   ) : (
                     <div className="py-2">
                       {searchResults.map((movie, i) => (
-                        <Link 
+                        <Link
                           key={`${movie.title}-${i}`}
                           href={`/movie/${encodeMovieTitle(movie.title)}`}
                           onClick={() => setShowSearchResults(false)}
@@ -434,9 +415,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ============================================================ */}
-        {/* ERROR STATE */}
-        {/* ============================================================ */}
+        {/* ERROR */}
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -447,10 +426,13 @@ export default function Home() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-red-300">Gagal memuat data</p>
               <p className="text-xs text-red-400/80 mt-0.5">{error}</p>
-              <p className="text-xs text-red-400/60 mt-1">Pastikan backend server berjalan di http://localhost:3001</p>
+              <p className="text-xs text-red-400/60 mt-1">Pastikan backend server berjalan</p>
             </div>
-            <button 
-              onClick={() => { setError(null); loadPopularMovies(1); }}
+            <button
+              onClick={() => {
+                setError(null);
+                loadPopularMovies(1);
+              }}
               className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors"
             >
               Coba Lagi
@@ -458,15 +440,11 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* ============================================================ */}
-        {/* TRENDING MOVIES (Horizontal Scroll) */}
-        {/* ============================================================ */}
+        {/* TRENDING */}
         <section className="mb-16">
           <div className="flex items-center gap-2 mb-6">
             <TrendingUp className="w-5 h-5 text-brand-300" />
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Film Trending
-            </h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Film Trending</h2>
             <span className="ml-2 px-2 py-0.5 rounded-full bg-brand-300/10 border border-brand-300/20 text-[10px] font-bold text-brand-200">
               Rating Tertinggi
             </span>
@@ -474,7 +452,7 @@ export default function Home() {
 
           {isLoadingTrending ? (
             <div className="flex gap-4 overflow-hidden">
-              {[1,2,3,4,5].map(i => (
+              {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="shrink-0 w-[260px] h-[160px] glass-panel rounded-2xl p-4 border border-white/5">
                   <div className="space-y-3">
                     <div className="h-4 w-12 bg-white/5 rounded shimmer-bg" />
@@ -496,7 +474,6 @@ export default function Home() {
                       transition={{ delay: idx * 0.06 }}
                       className="shrink-0 w-[280px] glass-panel rounded-2xl p-5 border border-white/5 cursor-pointer group hover:border-brand-300/20 transition-all hover:-translate-y-1"
                     >
-                      {/* Rank badge */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="w-7 h-7 rounded-lg bg-brand-300/15 border border-brand-300/25 flex items-center justify-center text-xs font-black text-brand-300">
@@ -509,14 +486,15 @@ export default function Home() {
                         </div>
                         <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-brand-300 transition-colors" />
                       </div>
-
                       <h3 className="text-sm font-bold text-white group-hover:text-brand-300 transition-colors leading-tight mb-2 line-clamp-2">
                         {movie.title}
                       </h3>
-                      
                       <div className="flex flex-wrap gap-1">
-                        {genres.slice(0, 2).map(g => (
-                          <span key={g} className="px-1.5 py-0.5 rounded text-[9px] font-bold text-brand-200/70 bg-brand-300/5 border border-brand-300/10">
+                        {genres.slice(0, 2).map((g) => (
+                          <span
+                            key={g}
+                            className="px-1.5 py-0.5 rounded text-[9px] font-bold text-brand-200/70 bg-brand-300/5 border border-brand-300/10"
+                          >
                             {g}
                           </span>
                         ))}
@@ -534,19 +512,14 @@ export default function Home() {
           )}
         </section>
 
-        {/* ============================================================ */}
-        {/* GENRE CATEGORIES */}
-        {/* ============================================================ */}
+        {/* GENRE */}
         <section className="mb-16">
           <div className="flex items-center gap-2 mb-6">
             <Sparkles className="w-5 h-5 text-brand-200" />
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Kategori Genre
-            </h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Kategori Genre</h2>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-6">
-            {/* All button */}
             <button
               onClick={() => setSelectedGenre(null)}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
@@ -557,7 +530,7 @@ export default function Home() {
             >
               Semua
             </button>
-            {GENRE_LIST.map(genre => (
+            {GENRE_LIST.map((genre) => (
               <button
                 key={genre}
                 onClick={() => setSelectedGenre(genre === selectedGenre ? null : genre)}
@@ -572,7 +545,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Genre filter results */}
           <AnimatePresence mode="wait">
             {selectedGenre && (
               <motion.div
@@ -584,7 +556,9 @@ export default function Home() {
               >
                 {isLoadingGenre ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+                    {[1, 2, 3, 4].map((i) => (
+                      <SkeletonCard key={i} />
+                    ))}
                   </div>
                 ) : genreMovies.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -595,7 +569,9 @@ export default function Home() {
                 ) : (
                   <div className="text-center py-12 glass-panel rounded-2xl border border-white/5">
                     <Film className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-sm text-slate-400">Tidak ada film ditemukan untuk genre &ldquo;{selectedGenre}&rdquo;</p>
+                    <p className="text-sm text-slate-400">
+                      Tidak ada film ditemukan untuk genre &ldquo;{selectedGenre}&rdquo;
+                    </p>
                   </div>
                 )}
               </motion.div>
@@ -603,15 +579,11 @@ export default function Home() {
           </AnimatePresence>
         </section>
 
-        {/* ============================================================ */}
-        {/* POPULAR MOVIES GRID */}
-        {/* ============================================================ */}
+        {/* POPULAR */}
         <section className="mb-16">
           <div className="flex items-center gap-2 mb-6">
             <Film className="w-5 h-5 text-brand-300" />
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Daftar Film
-            </h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Daftar Film</h2>
             <span className="ml-2 text-xs text-slate-500 font-medium">
               Halaman {popularPage} dari {totalPages}
             </span>
@@ -619,7 +591,9 @@ export default function Home() {
 
           {isLoadingPopular ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
+              {Array.from({ length: 12 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -629,7 +603,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 mt-8">
               <button
@@ -680,14 +653,10 @@ export default function Home() {
           )}
         </section>
 
-        {/* ============================================================ */}
-        {/* HOW IT WORKS (Pipeline) */}
-        {/* ============================================================ */}
+        {/* HOW IT WORKS */}
         <section className="border border-white/5 bg-slate-950/20 backdrop-blur-md rounded-2xl p-6 sm:p-8">
           <div className="text-center mb-8">
-            <h2 className="text-xl sm:text-2xl font-black text-white mb-2">
-              Bagaimana Sistem Bekerja?
-            </h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white mb-2">Bagaimana Sistem Bekerja?</h2>
             <p className="text-slate-400 text-sm font-light max-w-xl mx-auto">
               Alur kerja Content-Based Filtering dalam memberikan rekomendasi film yang akurat
             </p>
@@ -700,7 +669,10 @@ export default function Home() {
               { step: 3, title: 'Hitung Kemiripan', desc: 'TF-IDF Vectorizer dan Cosine Similarity digunakan untuk menghitung skor kemiripan.', icon: TrendingUp },
               { step: 4, title: 'Dapatkan Rekomendasi', desc: 'Film dengan skor kemiripan tertinggi ditampilkan sebagai rekomendasi.', icon: Star },
             ].map(({ step, title, desc, icon: Icon }) => (
-              <div key={step} className="p-5 rounded-xl bg-white/[0.01] border border-white/5 hover:border-brand-300/20 hover:bg-white/[0.03] transition-all text-center">
+              <div
+                key={step}
+                className="p-5 rounded-xl bg-white/[0.01] border border-white/5 hover:border-brand-300/20 hover:bg-white/[0.03] transition-all text-center"
+              >
                 <div className="w-10 h-10 rounded-xl bg-brand-300/10 border border-brand-300/20 text-brand-300 flex items-center justify-center mx-auto mb-3">
                   <Icon className="w-5 h-5" />
                 </div>
@@ -713,12 +685,9 @@ export default function Home() {
             ))}
           </div>
         </section>
-
       </main>
 
-      {/* ============================================================ */}
       {/* FOOTER */}
-      {/* ============================================================ */}
       <footer className="border-t border-white/5 py-8 bg-slate-950/30 backdrop-blur-md relative z-10 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
@@ -727,12 +696,9 @@ export default function Home() {
             <span>•</span>
             <span>Sistem Rekomendasi Film</span>
           </div>
-          <div>
-            &copy; 2026 SmartMovie. Content-Based Filtering dengan TF-IDF & Cosine Similarity.
-          </div>
+          <div>&copy; 2026 SmartMovie. Content-Based Filtering dengan TF-IDF & Cosine Similarity.</div>
         </div>
       </footer>
-
     </div>
   );
 }
