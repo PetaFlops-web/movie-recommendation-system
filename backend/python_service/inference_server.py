@@ -73,7 +73,7 @@ def load_and_process_data():
         df_processed.fillna('', inplace=True)
         
         # Bersihkan text (hapus karakter aneh)
-        for col in ['title', 'genres', 'overview', 'actors']:
+        for col in ['genres', 'overview', 'actors']:
             if col in df_processed.columns:
                 df_processed[col] = df_processed[col].astype(str).str.replace(r'[^\w\s\|,-]', '', regex=True)
         
@@ -172,17 +172,14 @@ def recommend_content_based():
                 movie_idx = matched_rows.index[0]
                 logger.info(f"✅ Found by exact title match: '{movie_title}' at index {movie_idx}")
             else:
-                # Fallback: Partial match (contains)
-                matched_rows = df_processed[df_processed['title'].str.contains(
-                    movie_title, case=False, na=False
-                )]
-                
+                # Fallback: Partial match
+                matched_rows = df_processed[df_processed['title'].str.contains(movie_title, case=False, na=False)]
                 if len(matched_rows) > 0:
                     movie_idx = matched_rows.index[0]
                     logger.info(f"✅ Found by partial title match: '{movie_title}' at index {movie_idx}")
                 else:
-                    logger.warning(f"❌ Movie title not found: '{movie_title}'")
-                    return jsonify({'error': f'Movie "{movie_title}" not found in dataset'}), 404
+                    # JANGAN langsung return 404 di sini, biarkan log mencatatnya saja
+                    logger.warning(f"⚠️ Movie title not found in text match: '{movie_title}'. Trying ID fallback...")
         
         # Prioritas 2: Cari berdasarkan movie_id (jika title tidak ditemukan)
         if movie_idx is None and movie_id is not None:
@@ -191,12 +188,12 @@ def recommend_content_based():
             if len(matched_rows) > 0:
                 movie_idx = matched_rows.index[0]
                 movie_title = matched_rows.iloc[0]['title']
-                logger.info(f"✅ Found by movie_id: {movie_id} -> '{movie_title}'")
+                logger.info(f"✅ Found by movie_id fallback: {movie_id} -> '{movie_title}'")
             else:
                 return jsonify({'error': f'Movie ID {movie_id} not found'}), 404
         
         if movie_idx is None:
-            return jsonify({'error': 'Could not find movie with provided parameters'}), 404
+            return jsonify({'error': f'Movie "{movie_title}" or ID {movie_id} not found in dataset'}), 404
         
         # Hitung similarity scores
         similarity_scores = list(enumerate(cosine_sim_matrix[movie_idx]))
