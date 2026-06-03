@@ -14,13 +14,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "CineMind AI — Stop Scrolling, Start Watching",
-  description: "Discover your next favorite movie with CineMind AI. Deep neural-collaborative filtering movie recommendations personalized to your unique taste, mood, and aesthetic preferences.",
-  keywords: ["AI Movie Recommendations", "Movie Discovery", "CineMind", "Film Matching", "Personalized Cinema", "Neural Collaborative Filtering"],
-  authors: [{ name: "CineMind Tech Team" }],
+  title: "SmartMovie — Sistem Rekomendasi Film Cerdas",
+  description: "Temukan film favoritmu dengan sistem rekomendasi berbasis Content-Based Filtering. Analisis kemiripan genre, aktor, sutradara, dan sinopsis untuk rekomendasi yang akurat.",
+  keywords: ["Rekomendasi Film", "Content-Based Filtering", "Movie Recommendation", "SmartMovie", "Film Indonesia", "Sistem Rekomendasi"],
+  authors: [{ name: "SmartMovie Team" }],
   openGraph: {
-    title: "CineMind AI — Stop Scrolling, Start Watching",
-    description: "Deep neural-collaborative filtering movie recommendations personalized to your unique taste and aesthetic preferences.",
+    title: "SmartMovie — Sistem Rekomendasi Film Cerdas",
+    description: "Temukan film favoritmu dengan sistem rekomendasi berbasis Content-Based Filtering. Rekomendasi akurat berdasarkan kemiripan konten.",
     type: "website",
   }
 };
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="id">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
