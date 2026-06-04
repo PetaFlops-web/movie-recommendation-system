@@ -16,7 +16,7 @@ import {
   Sparkles,
   CheckCircle,
 } from "lucide-react";
-import { register } from "../lib/auth";
+import { register, saveAuth } from "../lib/auth";
 
 const GENRE_LIST = [
   "Drama",
@@ -65,7 +65,11 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await register(username, email, password, selectedGenres);
+      const res = await register(username, email, password, selectedGenres);
+      // Save auth data (token + user info) from backend response
+      if (res.data) {
+        saveAuth(res.data);
+      }
       setSuccess(true);
       setTimeout(() => {
         router.push("/login");

@@ -1,4 +1,5 @@
-const API_BASE = '/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = `${API_BASE_URL}/api`;
 
 // ============================================================
 // Types
@@ -85,6 +86,31 @@ function mapRecommendation(raw: Record<string, unknown>): MovieWithSimilarity {
 }
 
 // ============================================================
+// Fetch helper with error handling for non-JSON responses
+// ============================================================
+
+async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(url, options);
+  } catch {
+    throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+  }
+  return res;
+}
+
+async function safeJsonParse(res: Response): Promise<Record<string, unknown>> {
+  const contentType = res.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    if (!res.ok) {
+      throw new Error(`Server error (HTTP ${res.status}). Coba lagi nanti.`);
+    }
+    throw new Error('Response dari server tidak valid. Periksa konfigurasi API URL.');
+  }
+  return res.json();
+}
+
+// ============================================================
 // API functions
 // ============================================================
 
@@ -101,15 +127,16 @@ export async function fetchMovies(
     params.set('search', search);
   }
 
-  const res = await fetch(`${API_BASE}/movies?${params.toString()}`);
+  const res = await safeFetch(`${API_BASE}/movies?${params.toString()}`);
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.message || `Gagal memuat film (HTTP ${res.status})`);
   }
 
-  const json = await res.json();
-  const rawMovies = json?.data?.movies || [];
-  const pagination = json?.data?.pagination || {};
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  const data = json?.data as Record<string, unknown> | undefined;
+  const rawMovies = (data?.movies as Record<string, unknown>[]) || [];
+  const pagination = (data?.pagination as Record<string, number>) || {};
 
   const totalPages =
     pagination.pages ??
@@ -147,11 +174,12 @@ export async function fetchMovieDetail(
   // 2) Coba fetch detail + rekomendasi dari backend menggunakan movie_id
   if (found.movie_id) {
     try {
-      const res = await fetch(`${API_BASE}/movies/${found.movie_id}`);
+      const res = await safeFetch(`${API_BASE}/movies/${found.movie_id}`);
       if (res.ok) {
-        const json = await res.json();
-        const movie = mapMovie(json?.data?.movie || found);
-        const recommendations = (json?.data?.recommendations || []).map(mapRecommendation);
+        const json = await safeJsonParse(res) as Record<string, unknown>;
+        const data = json?.data as Record<string, unknown> | undefined;
+        const movie = mapMovie((data?.movie as Record<string, unknown>) || found);
+        const recommendations = ((data?.recommendations as Record<string, unknown>[]) || []).map(mapRecommendation);
         return {
           success: true,
           movie,
@@ -172,7 +200,7 @@ export async function fetchMovieDetail(
 }
 
 export async function fetchHealthCheck(): Promise<HealthResponse> {
-  const res = await fetch(`${API_BASE}/health`);
+  const res = await safeFetch(`${API_BASE}/health`);
   if (!res.ok) {
     throw new Error(`Health check gagal (HTTP ${res.status})`);
   }

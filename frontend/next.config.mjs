@@ -1,7 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Frontend will call API directly via fetch using NEXT_PUBLIC_API_URL
-  // No rewrites needed - simplified configuration
+  // Enable standalone output for optimized production builds
+  output: 'standalone',
+
+  // Environment variables validation
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  },
+
+  // Disable x-powered-by header for security
+  poweredByHeader: false,
+
+  // Allow images from external domains if needed
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;

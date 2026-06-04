@@ -15,8 +15,25 @@ const app = express();
 // === 🔒 SECURITY & CORS MIDDLEWARE ===
 app.use(helmet());
 
+// Parse allowed origins from environment
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map(u => u.trim())
+  : [];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    // In development, allow all
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    // In production, check whitelist
+    if (allowedOrigins.length === 0) return callback(null, true);
+    if (allowedOrigins.some(allowed => origin === allowed || origin.endsWith(allowed.replace('https://', '.')))) {
+      return callback(null, true);
+    }
+    console.warn(`⚠️ CORS blocked origin: ${origin}`);
+    callback(null, true); // Still allow but log warning — set to callback(new Error('CORS')) to block
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true

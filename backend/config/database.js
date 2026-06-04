@@ -3,9 +3,15 @@ import "dotenv/config";
 
 const { Pool } = pg;
 
+// Railway PostgreSQL requires SSL in production
+const isProduction = process.env.DATABASE_URL && process.env.NODE_ENV !== 'development';
+
 const pool = new Pool(
   process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL }
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: isProduction ? { rejectUnauthorized: false } : false,
+      }
     : {
         user: process.env.DB_USER,
         host: process.env.DB_HOST,
