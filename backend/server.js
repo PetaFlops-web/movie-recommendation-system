@@ -32,7 +32,7 @@ function startPythonService() {
 
 // Start server
 function startServer() {
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('');
     console.log('╔════════════════════════════════════════════════════════╗');
     console.log('║   🎬 SMART MOVIE RECOMMENDATION SYSTEM                ║');
@@ -41,8 +41,8 @@ function startServer() {
     console.log('');
     console.log(`✅ Server running on port ${PORT}`);
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 API: http://localhost:${PORT}`);
-    console.log(`🏥 Health: http://localhost:${PORT}/api/health`);
+    console.log(`🔗 API: http://0.0.0.0:${PORT}`);
+    console.log(`🏥 Health: http://0.0.0.0:${PORT}/api/health`);
     console.log('');
   });
 
