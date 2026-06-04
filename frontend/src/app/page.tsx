@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -15,6 +16,7 @@ import {
   ChevronRight,
   AlertCircle,
   X,
+  LogOut,
 } from 'lucide-react';
 import {
   fetchMovies,
@@ -24,6 +26,7 @@ import {
   parseGenres,
   encodeMovieTitle,
 } from './lib/api';
+import { useAuth } from './contexts/AuthContext';
 
 // ============================================================
 // Debounce hook
@@ -62,7 +65,6 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
     >
       <Link href={`/movie/${encodeMovieTitle(movie.title)}`}>
         <div className="movie-card glass-panel rounded-2xl p-5 border border-white/5 cursor-pointer group h-full flex flex-col justify-between min-h-[220px]">
-          {/* Top */}
           <div>
             <div className="flex items-start justify-between mb-3">
               <div className="flex flex-wrap gap-1.5">
@@ -112,7 +114,6 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
             </div>
           </div>
 
-          {/* Bottom */}
           <div className="pt-3 mt-4 border-t border-white/5 flex items-center justify-between">
             <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">
               {genres.join(' • ')}
@@ -150,6 +151,9 @@ function SkeletonCard() {
 // Main Home Page
 // ============================================================
 export default function Home() {
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MovieFromAPI[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -170,6 +174,19 @@ export default function Home() {
   const [isLoadingGenre, setIsLoadingGenre] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+
+  // ---- Auth Guard ----
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  // ---- Logout ----
+  const handleLogout = () => {
+    logout();
+    router.replace('/login');
+  };
 
   // ---- Load Popular ----
   const loadPopularMovies = useCallback(async (page: number) => {
@@ -263,6 +280,15 @@ export default function Home() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ---- Auth Loading Guard ----
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center cinematic-bg">
+        <div className="loading-spinner w-12 h-12" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-screen z-10 selection:bg-brand-300/30 selection:text-brand-50">
       {/* Background */}
@@ -274,9 +300,12 @@ export default function Home() {
         <div className="neon-grid" />
       </div>
 
-      {/* HEADER */}
+      {/* ============================================================ */}
+      {/* HEADER / NAVBAR — dengan User Info + Logout                  */}
+      {/* ============================================================ */}
       <header className="sticky top-0 z-50 w-full glass-panel border-b border-white/5 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
+          {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-300 to-brand-200 flex items-center justify-center shadow-lg shadow-brand-300/20">
               <Film className="w-5 h-5 text-white" />
@@ -290,11 +319,33 @@ export default function Home() {
               </span>
             </div>
           </div>
+
+          {/* User Info + Logout */}
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-brand-300/15 border border-brand-300/25 flex items-center justify-center">
+                <span className="text-xs font-bold text-brand-300">
+                  {user?.username?.charAt(0).toUpperCase() || 'U'}
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-slate-300">{user?.username || 'User'}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-red-500/10 flex items-center gap-1.5 transition-all"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Keluar</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* MAIN */}
+      {/* ============================================================ */}
+      {/* MAIN CONTENT                                                 */}
+      {/* ============================================================ */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24">
+
         {/* HERO */}
         <section className="pt-8 sm:pt-12 lg:pt-16 pb-12 text-center">
           <div className="flex justify-center mb-6">
