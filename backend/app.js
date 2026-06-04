@@ -64,6 +64,11 @@ app.get('/', (req, res) => {
   });
 });
 
+// === 🚀 RAILWAY HEALTHCHECK FIX ===
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // === 🚫 404 HANDLER ===
 app.use((req, res) => {
   res.status(404).json({
