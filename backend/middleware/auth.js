@@ -1,10 +1,12 @@
-// middleware/auth.js
-const jwt = require('jsonwebtoken');
-const { get } = require('../config/database');
+import jwt from 'jsonwebtoken';
+import { query } from '../config/database.js';
 
+/**
+ * JWT Authentication Middleware
+ * Verifies Bearer token and attaches user to request
+ */
 const authMiddleware = async (req, res, next) => {
   try {
-    // Get token from header
     const authHeader = req.header('Authorization');
     
     if (!authHeader) {
@@ -14,7 +16,6 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    // Check if token starts with 'Bearer '
     if (!authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
@@ -27,10 +28,10 @@ const authMiddleware = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user still exists (using sqlite3 promise-based query)
-    const user = await get('SELECT id, username, email FROM users WHERE id = ?', [decoded.id]);
+    // Check if user still exists (PostgreSQL query)
+    const result = await query('SELECT id, username, email FROM users WHERE id = $1', [decoded.id]);
     
-    if (!user) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'User tidak ditemukan. Silakan login kembali.'
@@ -38,7 +39,7 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // Attach user to request
-    req.user = user;
+    req.user = result.rows[0];
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -63,4 +64,4 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = authMiddleware;
+export default authMiddleware;

@@ -2,8 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import joblib
 import os
 import sys
 import logging
@@ -26,98 +25,85 @@ tfidf_vectorizer = None
 cosine_sim_matrix = None
 
 def load_and_process_data():
-    """
-    Load CSV dataset dan preprocessing untuk content-based filtering
-    """
     global df_processed, tfidf_vectorizer, cosine_sim_matrix
     
     try:
-        # Path ke CSV file (sesuaikan dengan lokasi Anda)
-        csv_path = os.path.join(os.path.dirname(__file__), '..', 'model', 'movies.csv')
+        # Path ke folder model (c:\Akbar\model)
+        model_dir = os.path.join(os.path.dirname(__file__), 'model')
+        model_dir = os.path.normpath(model_dir)
         
+        logger.info(f"Model directory: {model_dir}")
+        
+        # --- 1. Load df_processed.csv ---
+        csv_path = os.path.join(model_dir, 'df_processed.csv')
         if not os.path.exists(csv_path):
-            logger.error(f"❌ CSV file not found: {csv_path}")
+            logger.error(f"df_processed.csv not found: {csv_path}")
             return False
         
-        logger.info(f"📥 Loading dataset from: {csv_path}")
-        
-        # Load CSV dengan encoding yang sesuai
+        logger.info(f"Loading processed dataset from: {csv_path}")
         df_processed = pd.read_csv(csv_path, encoding='utf-8')
         
-        # Standarisasi nama kolom (handle berbagai format CSV)
+        # Standarisasi nama kolom dari df_processed.csv
         column_mapping = {
             'Title': 'title',
             'Genre': 'genres',
             'Overview': 'overview',
             'Real_Actor': 'actors',
-            'actors': 'actors',
             'IMDB Score': 'imdb_rating',
-            'imdb_rating': 'imdb_rating',
             'Year': 'year',
             'Premiere': 'premiere',
             'Runtime': 'runtime',
             'Language': 'language'
         }
-        
-        # Rename columns jika ada yang match
         existing_cols = {k: v for k, v in column_mapping.items() if k in df_processed.columns}
         df_processed.rename(columns=existing_cols, inplace=True)
         
         # Pastikan kolom penting ada
-        required_cols = ['title', 'genres']
-        for col in required_cols:
+        for col in ['title', 'genres']:
             if col not in df_processed.columns:
-                df_processed[col] = ''  # Buat kolom kosong jika tidak ada
+                df_processed[col] = ''
         
-        # Fill NaN values
         df_processed.fillna('', inplace=True)
-        
-        # Bersihkan text (hapus karakter aneh)
-        for col in ['genres', 'overview', 'actors']:
-            if col in df_processed.columns:
-                df_processed[col] = df_processed[col].astype(str).str.replace(r'[^\w\s\|,-]', '', regex=True)
         
         # Generate unique movie_id jika belum ada
         if 'movie_id' not in df_processed.columns:
             df_processed['movie_id'] = range(1, len(df_processed) + 1)
         
-        # Buat combined features untuk TF-IDF
-        # Gabungkan genres, overview, dan actors untuk similarity calculation
-        df_processed['combined_features'] = (
-            df_processed['genres'].astype(str) + ' ' +
-            df_processed['overview'].astype(str) + ' ' +
-            df_processed['actors'].astype(str)
-        )
+        logger.info(f"Dataset loaded: {len(df_processed)} movies")
+        logger.info(f"Columns: {list(df_processed.columns)}")
         
-        logger.info(f"✅ Dataset loaded: {len(df_processed)} movies")
-        logger.info(f"📊 Columns: {list(df_processed.columns)}")
+        # --- 2. Load tfidf_vectorizer.pkl ---
+        tfidf_path = os.path.join(model_dir, 'tfidf_vectorizer.pkl')
+        if not os.path.exists(tfidf_path):
+            logger.error(f"tfidf_vectorizer.pkl not found: {tfidf_path}")
+            return False
         
-        # Hitung TF-IDF vectorizer
-        logger.info("🔄 Computing TF-IDF vectors...")
-        tfidf_vectorizer = TfidfVectorizer(
-            stop_words='english',
-            max_features=5000,
-            ngram_range=(1, 2),
-            min_df=1,
-            max_df=0.95
-        )
+        logger.info(f"Loading TF-IDF vectorizer from: {tfidf_path}")
+        tfidf_vectorizer = joblib.load(tfidf_path)
+        logger.info(f"TF-IDF vectorizer loaded successfully")
         
-        tfidf_matrix = tfidf_vectorizer.fit_transform(df_processed['combined_features'])
+        # --- 3. Load cosine_sim_matrix.pkl ---
+        cosine_path = os.path.join(model_dir, 'cosine_sim_matrix.pkl')
+        if not os.path.exists(cosine_path):
+            logger.error(f"cosine_sim_matrix.pkl not found: {cosine_path}")
+            return False
         
-        # Hitung Cosine Similarity Matrix
-        logger.info("🔄 Computing Cosine Similarity matrix...")
-        cosine_sim_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
-        
-        logger.info(f"✅ Models ready! Similarity matrix shape: {cosine_sim_matrix.shape}")
+        logger.info(f"Loading Cosine Similarity matrix from: {cosine_path}")
+        cosine_sim_matrix = joblib.load(cosine_path)
+        logger.info(f"Cosine Similarity matrix loaded! Shape: {cosine_sim_matrix.shape}")
         
         # Tampilkan sample data
-        sample = df_processed[['movie_id', 'title', 'genres']].head(3)
+        title_col = 'title' if 'title' in df_processed.columns else df_processed.columns[0]
+        genre_col = 'genres' if 'genres' in df_processed.columns else 'Genre'
+        sample_cols = ['movie_id', title_col, genre_col]
+        sample_cols = [c for c in sample_cols if c in df_processed.columns]
+        sample = df_processed[sample_cols].head(3)
         logger.info(f"📋 Sample data:\n{sample.to_string(index=False)}")
         
         return True
         
     except Exception as e:
-        logger.error(f"❌ Error loading data: {str(e)}")
+        logger.error(f"Error loading model artifacts: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
         return False
@@ -170,13 +156,13 @@ def recommend_content_based():
             
             if len(matched_rows) > 0:
                 movie_idx = matched_rows.index[0]
-                logger.info(f"✅ Found by exact title match: '{movie_title}' at index {movie_idx}")
+                logger.info(f"Found by exact title match: '{movie_title}' at index {movie_idx}")
             else:
                 # Fallback: Partial match
                 matched_rows = df_processed[df_processed['title'].str.contains(movie_title, case=False, na=False)]
                 if len(matched_rows) > 0:
                     movie_idx = matched_rows.index[0]
-                    logger.info(f"✅ Found by partial title match: '{movie_title}' at index {movie_idx}")
+                    logger.info(f"Found by partial title match: '{movie_title}' at index {movie_idx}")
                 else:
                     # JANGAN langsung return 404 di sini, biarkan log mencatatnya saja
                     logger.warning(f"⚠️ Movie title not found in text match: '{movie_title}'. Trying ID fallback...")
@@ -188,7 +174,7 @@ def recommend_content_based():
             if len(matched_rows) > 0:
                 movie_idx = matched_rows.index[0]
                 movie_title = matched_rows.iloc[0]['title']
-                logger.info(f"✅ Found by movie_id fallback: {movie_id} -> '{movie_title}'")
+                logger.info(f"Found by movie_id fallback: {movie_id} -> '{movie_title}'")
             else:
                 return jsonify({'error': f'Movie ID {movie_id} not found'}), 404
         
@@ -228,7 +214,7 @@ def recommend_content_based():
                 'similarity_score': round(float(score), 4)
             })
         
-        logger.info(f"✅ Returning {len(recommendations)} recommendations")
+        logger.info(f"Returning {len(recommendations)} recommendations")
         
         return jsonify({
             'success': True,
@@ -242,7 +228,7 @@ def recommend_content_based():
         })
         
     except Exception as e:
-        logger.error(f"❌ Error in recommend_content_based: {str(e)}")
+        logger.error(f"Error in recommend_content_based: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
         return jsonify({'error': str(e), 'type': type(e).__name__}), 500
@@ -303,7 +289,7 @@ def search_movies():
         })
         
     except Exception as e:
-        logger.error(f"❌ Error in search_movies: {str(e)}")
+        logger.error(f"Error in search_movies: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/movies/<int:movie_id>', methods=['GET'])
@@ -336,7 +322,7 @@ def get_movie_by_id(movie_id):
         })
         
     except Exception as e:
-        logger.error(f"❌ Error in get_movie_by_id: {str(e)}")
+        logger.error(f"Error in get_movie_by_id: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Initialize models saat aplikasi start
@@ -358,7 +344,7 @@ if __name__ == '__main__':
     
     # Load models before starting server
     if load_and_process_data():
-        logger.info("✅ Models loaded successfully!")
+        logger.info("Models loaded successfully!")
     else:
         logger.warning("⚠️  Models failed to load. Start server anyway.")
     

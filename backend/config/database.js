@@ -1,5 +1,7 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+import pg from 'pg';
+import 'dotenv/config';
+
+const { Pool } = pg;
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -9,7 +11,7 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT) || 5432,
 });
 
-const initDB = async () => {
+export const initDB = async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -56,6 +58,6 @@ const initDB = async () => {
   }
 };
 
-const query = (text, params) => pool.query(text, params);
+export const query = (text, params) => pool.query(text, params);
 
-module.exports = { pool, query, initDB };
+export { pool };

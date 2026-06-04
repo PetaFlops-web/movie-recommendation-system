@@ -1,20 +1,19 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const path = require('path');
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
 
 // Import konfigurasi & routes
-const { initDB } = require('./config/database');
-const authRoutes = require('./routes/auth');
-const movieRoutes = require('./routes/movies');
-const mlService = require('./services/mlService');
+import { initDB } from './config/database.js';
+import authRoutes from './routes/auth.routes.js';
+import movieRoutes from './routes/movie.routes.js';
+import healthRoutes from './routes/health.routes.js';
 
 const app = express();
 
 // === 🔒 SECURITY & CORS MIDDLEWARE ===
-app.use(helmet()); // Melindungi header HTTP dari vulnerability umum
+app.use(helmet());
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
@@ -29,23 +28,20 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // === 📝 LOGGING ===
 if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev')); // Format ringkas untuk development
+  app.use(morgan('dev'));
 } else {
-  app.use(morgan('combined')); // Format lengkap untuk production
+  app.use(morgan('combined'));
 }
 
 // === 🗄️ DATABASE INITIALIZATION ===
-// Membuat tabel otomatis saat server startup (jika belum ada)
 initDB()
   .then(() => console.log('✅ Database connection pool ready'))
   .catch(err => console.error('❌ DB Initialization failed:', err));
 
 // === 🛣️ ROUTES MOUNTING ===
-// Autentikasi & Preferensi User
 app.use('/api/auth', authRoutes);
-
-// Film, Pencarian, Detail & Top 10 Rekomendasi (Content-Based)
 app.use('/api/movies', movieRoutes);
+app.use('/api/health', healthRoutes);
 
 // === 🏠 ROOT ENDPOINT ===
 app.get('/', (req, res) => {
@@ -68,32 +64,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// === 🏥 HEALTH CHECK ===
-app.get('/api/health', async (req, res) => {
-  try {
-    const mlStatus = await mlService.healthCheck();
-    res.json({
-      status: 'OK',
-      timestamp: new Date().toISOString(),
-      service: 'Smart Movie Recommendation Backend',
-      database: 'PostgreSQL',
-      ml_service: mlStatus,
-      team: 'PJK-GM059'
-    });
-  } catch (err) {
-    // Tetap return 200 agar monitoring tidak panic, tapi kasih tau status ML
-    res.json({
-      status: 'OK',
-      timestamp: new Date().toISOString(),
-      service: 'Smart Movie Recommendation Backend',
-      database: 'PostgreSQL',
-      ml_service: { status: 'unreachable', note: 'Python ML service might be down' },
-      team: 'PJK-GM059'
-    });
-  }
-});
-
-// ===  404 HANDLER ===
+// === 🚫 404 HANDLER ===
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -103,7 +74,7 @@ app.use((req, res) => {
 });
 
 // === 💥 GLOBAL ERROR HANDLER ===
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('💥 Server Error:', err);
   res.status(err.status || 500).json({
     success: false,
@@ -112,4 +83,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-module.exports = app;
+export default app;

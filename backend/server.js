@@ -1,6 +1,11 @@
-const app = require('./app');
-const { spawn } = require('child_process');
-require('dotenv').config();
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import 'dotenv/config';
+import app from './app.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 
@@ -62,10 +67,8 @@ function startServer() {
 }
 
 // Main execution
-let pythonService;
-
 if (process.env.START_PYTHON_SERVICE !== 'false') {
-  pythonService = startPythonService();
+  startPythonService();
   
   // Wait for Python service to initialize
   setTimeout(() => {
@@ -76,5 +79,3 @@ if (process.env.START_PYTHON_SERVICE !== 'false') {
   console.log('⚠️  Python ML Service disabled (START_PYTHON_SERVICE=false)');
   startServer();
 }
-
-module.exports = app;

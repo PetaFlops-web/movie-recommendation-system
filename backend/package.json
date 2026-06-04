@@ -2,6 +2,7 @@
   "name": "smart-movie-recommendation-backend",
   "version": "1.0.0",
   "description": "Backend for Smart Movie Recommendation System - PJK-GM059 Capstone Project",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

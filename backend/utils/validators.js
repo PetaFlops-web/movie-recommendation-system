@@ -1,7 +1,7 @@
-const { body, param, query } = require('express-validator');
+import { body, param, query } from 'express-validator';
 
 // Validation rules for registration
-const registerValidation = [
+export const registerValidation = [
   body('username')
     .trim()
     .isLength({ min: 3, max: 50 })
@@ -29,7 +29,7 @@ const registerValidation = [
 ];
 
 // Validation rules for login
-const loginValidation = [
+export const loginValidation = [
   body('email')
     .isEmail()
     .normalizeEmail()
@@ -41,7 +41,7 @@ const loginValidation = [
 ];
 
 // Validation rules for preferences
-const preferencesValidation = [
+export const preferencesValidation = [
   body('genres')
     .isArray({ min: 1, max: 20 })
     .withMessage('Pilih minimal 1 dan maksimal 20 genre')
@@ -54,14 +54,14 @@ const preferencesValidation = [
 ];
 
 // Validation rules for movie ID
-const movieIdValidation = [
+export const movieIdValidation = [
   param('id')
     .isInt({ min: 1 })
     .withMessage('ID film harus berupa angka positif')
 ];
 
 // Validation rules for query parameters
-const searchValidation = [
+export const searchValidation = [
   query('q')
     .optional()
     .trim()
@@ -82,11 +82,3 @@ const searchValidation = [
     .isInt({ min: 1 })
     .withMessage('Page harus lebih dari 0')
 ];
-
-module.exports = {
-  registerValidation,
-  loginValidation,
-  preferencesValidation,
-  movieIdValidation,
-  searchValidation
-};

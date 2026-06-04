@@ -1,7 +1,11 @@
-const fs = require('fs');
-const path = require('path');
-const csv = require('csv-parser');
-const { query, initDB } = require('../config/database');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import csv from 'csv-parser';
+import { query, initDB, pool } from '../config/database.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const CSV_PATH = process.env.CSV_PATH || path.join(__dirname, '..', 'model', 'movies.csv');
 
@@ -50,11 +54,11 @@ async function importMovies() {
 
     console.log(`✅ Parsed ${movies.length} movies. Inserting to PostgreSQL...`);
 
-    const client = await require('../config/database').pool.connect();
+    const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Buat tabel movies dengan struktur yang sesuai CSV Anda
+      // Buat tabel movies dengan struktur yang sesuai CSV
       await client.query(`
         CREATE TABLE IF NOT EXISTS movies (
           id SERIAL PRIMARY KEY,
@@ -109,7 +113,7 @@ async function importMovies() {
       console.error('❌ Import failed:', err);
     } finally {
       client.release();
-      await require('../config/database').pool.end();
+      await pool.end();
     }
   } catch (err) {
     console.error('💥 Fatal:', err);
