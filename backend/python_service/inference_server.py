@@ -194,6 +194,7 @@ def recommend_content_based():
         
         if movie_idx is None:
             return jsonify({'error': f'Movie "{movie_title}" or ID {movie_id} not found in dataset'}), 404
+
         
         # Hitung similarity scores
         similarity_scores = list(enumerate(cosine_sim_matrix[movie_idx]))
