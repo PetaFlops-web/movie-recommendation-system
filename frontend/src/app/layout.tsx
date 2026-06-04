@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -15,14 +16,9 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "SmartMovie — Sistem Rekomendasi Film Cerdas",
-  description: "Temukan film favoritmu dengan sistem rekomendasi berbasis Content-Based Filtering. Analisis kemiripan genre, aktor, sutradara, dan sinopsis untuk rekomendasi yang akurat.",
-  keywords: ["Rekomendasi Film", "Content-Based Filtering", "Movie Recommendation", "SmartMovie", "Film Indonesia", "Sistem Rekomendasi"],
+  description: "Temukan film favoritmu dengan sistem rekomendasi berbasis Content-Based Filtering.",
+  keywords: ["Rekomendasi Film", "Content-Based Filtering", "Movie Recommendation", "SmartMovie"],
   authors: [{ name: "SmartMovie Team" }],
-  openGraph: {
-    title: "SmartMovie — Sistem Rekomendasi Film Cerdas",
-    description: "Temukan film favoritmu dengan sistem rekomendasi berbasis Content-Based Filtering. Rekomendasi akurat berdasarkan kemiripan konten.",
-    type: "website",
-  }
 };
 
 export default function RootLayout({
@@ -32,10 +28,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
