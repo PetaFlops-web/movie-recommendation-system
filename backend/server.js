@@ -67,7 +67,7 @@ function startServer() {
 }
 
 // Main execution
-if (process.env.START_PYTHON_SERVICE !== 'false') {
+if (process.env.START_PYTHON_SERVICE === 'true') {
   startPythonService();
   
   // Wait for Python service to initialize
@@ -76,6 +76,6 @@ if (process.env.START_PYTHON_SERVICE !== 'false') {
     startServer();
   }, 3000);
 } else {
-  console.log('⚠️  Python ML Service disabled (START_PYTHON_SERVICE=false)');
+  console.log('⚠️  Python ML Service disabled (START_PYTHON_SERVICE is not true)');
   startServer();
 }
