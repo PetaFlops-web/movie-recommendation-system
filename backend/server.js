@@ -1,13 +1,18 @@
+console.log('===> server.js is executing...');
+
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import 'dotenv/config';
 import app from './app.js';
 
+console.log('===> All imports loaded successfully.');
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT) || 3000;
+console.log(`===> Target PORT configured as: ${PORT}`);
 
 // Start Python ML Service
 function startPythonService() {
@@ -32,39 +37,50 @@ function startPythonService() {
 
 // Start server
 function startServer() {
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log('');
-    console.log('╔════════════════════════════════════════════════════════╗');
-    console.log('║   🎬 SMART MOVIE RECOMMENDATION SYSTEM                ║');
-    console.log('║   Team: PJK-GM059                                     ║');
-    console.log('╚════════════════════════════════════════════════════════╝');
-    console.log('');
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 API: http://0.0.0.0:${PORT}`);
-    console.log(`🏥 Health: http://0.0.0.0:${PORT}/api/health`);
-    console.log('');
-  });
-
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('📴 SIGTERM received, shutting down gracefully...');
-    server.close(() => {
-      console.log('✅ Process terminated');
-      process.exit(0);
+  console.log(`===> Attempting to bind to 0.0.0.0:${PORT}...`);
+  try {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log('');
+      console.log('╔════════════════════════════════════════════════════════╗');
+      console.log('║   🎬 SMART MOVIE RECOMMENDATION SYSTEM                ║');
+      console.log('║   Team: PJK-GM059                                     ║');
+      console.log('╚════════════════════════════════════════════════════════╝');
+      console.log('');
+      console.log(`✅ Server running on port ${PORT}`);
+      console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔗 API: http://0.0.0.0:${PORT}`);
+      console.log(`🏥 Health: http://0.0.0.0:${PORT}/api/health`);
+      console.log('');
     });
-  });
 
-  process.on('SIGINT', () => {
-    console.log('📴 SIGINT received, shutting down...');
-    server.close(() => {
-      console.log('✅ Process terminated');
-      process.exit(0);
+    server.on('error', (e) => {
+      console.error('❌ Server Listen Error:', e);
     });
-  });
 
-  return server;
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('📴 SIGTERM received, shutting down gracefully...');
+      server.close(() => {
+        console.log('✅ Process terminated');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', () => {
+      console.log('📴 SIGINT received, shutting down...');
+      server.close(() => {
+        console.log('✅ Process terminated');
+        process.exit(0);
+      });
+    });
+
+    return server;
+  } catch (error) {
+    console.error('❌ Fatal Error during app.listen:', error);
+  }
 }
+
+console.log(`===> START_PYTHON_SERVICE value: ${process.env.START_PYTHON_SERVICE}`);
 
 // Main execution
 if (process.env.START_PYTHON_SERVICE === 'true') {
