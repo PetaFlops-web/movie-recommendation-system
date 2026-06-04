@@ -241,7 +241,7 @@ export default function MovieDetailPage() {
                 {recommendations.length > 0 ? (
                   <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-semibold">
                     <Sparkles className="w-4 h-4" />
-                    {recommendations.length} rekomendasi ditemukan berdasarkan kemiripan konten
+                    {recommendations.length} rekomendasi film serupa untukmu
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-slate-300 text-sm font-semibold">
@@ -261,7 +261,7 @@ export default function MovieDetailPage() {
             <div>
               <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Rekomendasi Serupa</h2>
               <p className="text-slate-400 text-sm mt-1">
-                Berdasarkan kemiripan konten dengan <strong className="text-brand-200">{movie.title}</strong>
+                Koleksi film yang mirip dengan <strong className="text-brand-200">{movie.title}</strong>
               </p>
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function MovieDetailPage() {
               <Film className="w-12 h-12 text-slate-600 mx-auto mb-4" />
               <h3 className="text-white font-bold text-lg mb-2">Tidak Ada Rekomendasi</h3>
               <p className="text-slate-400 text-sm">
-                Film ini belum terdaftar di dataset model ML sehingga rekomendasi tidak tersedia.
+                Belum ada rekomendasi serupa untuk film ini.
               </p>
             </div>
           ) : (
@@ -287,13 +287,7 @@ export default function MovieDetailPage() {
                   >
                     <Link href={`/movie/${encodeMovieTitle(rec.title)}`}>
                       <div className="movie-card glass-panel rounded-3xl p-5 border border-white/5 relative overflow-hidden group shadow-lg flex flex-col justify-between min-h-[240px] text-left cursor-pointer">
-                        <div className="relative z-10 flex items-start justify-between">
-                          <div className="similarity-badge flex items-center gap-1.5 px-2.5 py-1 rounded-full">
-                            <span className="w-1.5 h-1.5 rounded-full bg-brand-300 animate-pulse" />
-                            <span className="text-[10px] text-white tracking-wider font-extrabold uppercase">
-                              {formatSimilarityScore(rec.similarity_score)} Mirip
-                            </span>
-                          </div>
+                        <div className="relative z-10 flex items-start justify-end">
                           {rec.imdb_score > 0 && (
                             <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded border border-white/5 text-[10px] text-slate-300 font-bold">
                               <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -306,9 +300,15 @@ export default function MovieDetailPage() {
                           <h3 className="text-lg font-black text-white group-hover:text-brand-300 transition-colors tracking-tight leading-tight mb-2 line-clamp-2">
                             {rec.title}
                           </h3>
-                          <span className="text-[10px] text-slate-400 font-semibold uppercase block mb-3 line-clamp-1">
+                          <span className="text-[10px] text-slate-400 font-semibold uppercase block mb-2 line-clamp-1">
                             {parseGenres(rec.genre).join(' • ')}
                           </span>
+                          <p className="text-[11px] text-slate-400/80 leading-relaxed line-clamp-3 mb-3 font-light">
+                            {rec.overview && rec.overview !== 'nan' && rec.overview.trim() !== ''
+                              ? rec.overview
+                              : <span className="italic text-slate-500/60">Sinopsis belum tersedia untuk film ini.</span>
+                            }
+                          </p>
                           <div className="w-full bg-white/5 rounded-full h-1.5 mt-2 overflow-hidden">
                             <div
                               className="bg-gradient-to-r from-brand-400 to-brand-200 h-1.5 rounded-full score-bar-fill"

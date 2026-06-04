@@ -64,7 +64,7 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
       transition={{ duration: 0.4, delay: index * 0.05 }}
     >
       <Link href={`/movie/${encodeMovieTitle(movie.title)}`}>
-        <div className="movie-card glass-panel rounded-2xl p-5 border border-white/5 cursor-pointer group h-full flex flex-col justify-between min-h-[220px]">
+        <div className="movie-card glass-panel rounded-2xl p-5 border border-white/5 cursor-pointer group h-full flex flex-col justify-between min-h-[260px]">
           <div>
             <div className="flex items-start justify-between mb-3">
               <div className="flex flex-wrap gap-1.5">
@@ -89,7 +89,7 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
               {movie.title}
             </h3>
 
-            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium mb-3">
               {movie.year && (
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
@@ -112,6 +112,12 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
                 </>
               )}
             </div>
+            <p className="text-[11px] text-slate-400/80 leading-relaxed line-clamp-2 font-light">
+              {movie.overview && movie.overview !== 'nan' && movie.overview.trim() !== ''
+                ? movie.overview
+                : <span className="italic text-slate-500/60">Sinopsis belum tersedia untuk film ini.</span>
+              }
+            </p>
           </div>
 
           <div className="pt-3 mt-4 border-t border-white/5 flex items-center justify-between">
@@ -133,7 +139,7 @@ function MovieCard({ movie, index }: { movie: MovieFromAPI; index: number }) {
 // ============================================================
 function SkeletonCard() {
   return (
-    <div className="glass-panel rounded-2xl p-5 border border-white/5 h-[220px] flex flex-col justify-between">
+    <div className="glass-panel rounded-2xl p-5 border border-white/5 h-[260px] flex flex-col justify-between">
       <div className="space-y-3">
         <div className="flex gap-2">
           <div className="h-4 w-14 bg-white/5 rounded-full shimmer-bg" />
@@ -141,6 +147,10 @@ function SkeletonCard() {
         </div>
         <div className="h-5 w-3/4 bg-white/5 rounded shimmer-bg" />
         <div className="h-3 w-1/2 bg-white/5 rounded shimmer-bg" />
+        <div className="space-y-1.5 pt-2">
+          <div className="h-2 w-full bg-white/5 rounded shimmer-bg" />
+          <div className="h-2 w-2/3 bg-white/5 rounded shimmer-bg" />
+        </div>
       </div>
       <div className="h-8 w-full bg-white/5 rounded shimmer-bg" />
     </div>
@@ -354,7 +364,7 @@ export default function Home() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-300 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-300" />
               </span>
-              <span className="font-medium tracking-wide">Sistem Rekomendasi Film Berbasis Content-Based Filtering</span>
+              <span className="font-medium tracking-wide">Platform Rekomendasi Film Terbaik</span>
             </div>
           </div>
 
@@ -364,8 +374,7 @@ export default function Home() {
           </h1>
 
           <p className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed font-light">
-            Cari film yang kamu suka, lalu dapatkan rekomendasi film serupa berdasarkan kemiripan genre, sinopsis, dan
-            karakteristik konten lainnya.
+            Eksplorasi ribuan film dari berbagai genre. Cari judul favoritmu dan temukan tontonan seru lainnya yang khusus direkomendasikan untukmu.
           </p>
 
           {/* SEARCH */}
@@ -704,38 +713,7 @@ export default function Home() {
           )}
         </section>
 
-        {/* HOW IT WORKS */}
-        <section className="border border-white/5 bg-slate-950/20 backdrop-blur-md rounded-2xl p-6 sm:p-8">
-          <div className="text-center mb-8">
-            <h2 className="text-xl sm:text-2xl font-black text-white mb-2">Bagaimana Sistem Bekerja?</h2>
-            <p className="text-slate-400 text-sm font-light max-w-xl mx-auto">
-              Alur kerja Content-Based Filtering dalam memberikan rekomendasi film yang akurat
-            </p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[
-              { step: 1, title: 'Pilih Film', desc: 'Cari dan pilih film yang kamu sukai dari daftar film yang tersedia.', icon: Search },
-              { step: 2, title: 'Analisis Konten', desc: 'Sistem menganalisis atribut film: genre, sinopsis, kata kunci, dan metadata lainnya.', icon: Sparkles },
-              { step: 3, title: 'Hitung Kemiripan', desc: 'TF-IDF Vectorizer dan Cosine Similarity digunakan untuk menghitung skor kemiripan.', icon: TrendingUp },
-              { step: 4, title: 'Dapatkan Rekomendasi', desc: 'Film dengan skor kemiripan tertinggi ditampilkan sebagai rekomendasi.', icon: Star },
-            ].map(({ step, title, desc, icon: Icon }) => (
-              <div
-                key={step}
-                className="p-5 rounded-xl bg-white/[0.01] border border-white/5 hover:border-brand-300/20 hover:bg-white/[0.03] transition-all text-center"
-              >
-                <div className="w-10 h-10 rounded-xl bg-brand-300/10 border border-brand-300/20 text-brand-300 flex items-center justify-center mx-auto mb-3">
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className="text-[10px] text-brand-300 font-extrabold tracking-widest uppercase mb-1">
-                  Langkah {step}
-                </div>
-                <h3 className="text-sm font-bold text-white mb-1.5">{title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed font-light">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
       </main>
 
       {/* FOOTER */}
@@ -745,9 +723,9 @@ export default function Home() {
             <Film className="w-4 h-4 text-brand-300" />
             <span>SmartMovie</span>
             <span>•</span>
-            <span>Sistem Rekomendasi Film</span>
+            <span>Platform Film & Rekomendasi</span>
           </div>
-          <div>&copy; 2026 SmartMovie. Content-Based Filtering dengan TF-IDF & Cosine Similarity.</div>
+          <div>&copy; {new Date().getFullYear()} SmartMovie. Semua hak cipta dilindungi.</div>
         </div>
       </footer>
     </div>
