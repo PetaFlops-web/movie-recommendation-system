@@ -129,7 +129,16 @@ export const topByGenre = async (req, res) => {
  */
 export const recommendByGenre = async (req, res) => {
   try {
-    const { genres, limit = 10 } = req.query;
+    const { genres } = req.query;
+    const limit = parseInt(req.query.limit, 10) || 10;
+
+    if (isNaN(limit) || limit <= 0) {
+      return res.status(400).json({ // Sesuaikan dengan fungsi errorResponse kamu
+        success: false,
+        message: 'Parameter limit harus berupa angka positif'
+      });
+    }
+
     if (!genres) {
       return errorResponse(res, 'Parameter genres diperlukan', 400);
     }
