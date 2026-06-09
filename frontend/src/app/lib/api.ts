@@ -1,52 +1,8 @@
+import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse, HealthResponse } from '@/types/movieType';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API_BASE = `${API_BASE_URL}/api`;
 
-// ============================================================
-// Types
-// ============================================================
-
-export interface MovieFromAPI {
-  movie_id?: number;
-  title: string;
-  genre: string;
-  actors?: string;
-  overview?: string;
-  imdb_score: number;
-  imdb_rating?: string | number;
-  year: string;
-  runtime?: number;
-  language?: string;
-  premiere?: string;
-}
-
-export interface MovieWithSimilarity extends MovieFromAPI {
-  similarity_score: number;
-}
-
-export interface MoviesResponse {
-  success: boolean;
-  page: number;
-  limit: number;
-  total: number;
-  total_pages: number;
-  movies: MovieFromAPI[];
-}
-
-export interface MovieDetailResponse {
-  success: boolean;
-  movie: MovieFromAPI;
-  recommendations: MovieWithSimilarity[];
-}
-
-export interface HealthResponse {
-  success: boolean;
-  data?: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
-// ============================================================
-// Mapping helpers
-// ============================================================
 
 function parseRating(value: unknown): number {
   if (value === undefined || value === null || value === '' || value === 'nan') return 0;
@@ -110,9 +66,6 @@ async function safeJsonParse(res: Response): Promise<Record<string, unknown>> {
   return res.json();
 }
 
-// ============================================================
-// API functions
-// ============================================================
 
 export async function fetchMovies(
   page: number = 1,
@@ -152,11 +105,6 @@ export async function fetchMovies(
   };
 }
 
-/**
- * Fetch detail film + rekomendasi berdasarkan judul film.
- * Alur: search by title → ambil movie_id → fetch detail by movie_id
- * Jika film tidak ada di ML dataset, tetap kembalikan data film dari search
- */
 export async function fetchMovieDetail(
   title: string
 ): Promise<MovieDetailResponse> {
@@ -171,7 +119,6 @@ export async function fetchMovieDetail(
     throw new Error('Film tidak ditemukan');
   }
 
-  // 2) Coba fetch detail + rekomendasi dari backend menggunakan movie_id
   if (found.movie_id) {
     try {
       const res = await safeFetch(`${API_BASE}/movies/${found.movie_id}`);
@@ -207,9 +154,7 @@ export async function fetchHealthCheck(): Promise<HealthResponse> {
   return res.json();
 }
 
-// ============================================================
-// Helpers
-// ============================================================
+
 
 export function formatIMDBScore(score: number): string {
   return score ? score.toFixed(1) : 'N/A';

@@ -16,16 +16,9 @@ import {
   Zap,
   AlertCircle,
 } from "lucide-react";
-import {
-  decodeMovieTitle,
-  encodeMovieTitle,
-  fetchMovieDetail,
-  formatIMDBScore,
-  formatRuntime,
-  parseGenres,
-  type MovieFromAPI,
-  type MovieWithSimilarity,
-} from "../../lib/api";
+import { MovieFromAPI, MovieWithSimilarity } from "@/types/movieType";
+import { decodeMovieTitle, formatIMDBScore, formatRuntime, parseGenres, encodeMovieTitle } from "@/helpers/jsosParser";
+import { fetchMovieDetail } from "@/app/lib/api";
 
 export default function MovieDetailPage() {
   const params = useParams();
@@ -140,7 +133,7 @@ export default function MovieDetailPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <main className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {/* DETAIL */}
         <section className="glass-panel rounded-3xl p-6 sm:p-8 lg:p-10 border border-brand-300/10 shadow-2xl relative overflow-hidden mb-12">
           <div className="absolute inset-0 bg-slate-950/60 z-0 backdrop-blur-[2px]" />
@@ -149,20 +142,21 @@ export default function MovieDetailPage() {
             {/* Poster */}
             <div className="lg:col-span-4 flex justify-center">
               <div
-                className="w-full max-w-[280px] aspect-[2/3] rounded-2xl relative overflow-hidden shadow-2xl border border-white/15 flex flex-col justify-between p-6 transition-all duration-500 hover:scale-[1.02]"
+                className="w-full max-w-[420px] aspect-[2/3] rounded-2xl relative overflow-hidden shadow-2xl border border-white/15 flex flex-col justify-between p-6 transition-all duration-500 hover:scale-[1.02]"
                 style={{
                   background: backdropGradient,
                   boxShadow: `0 20px 40px -10px ${glowColor}25, 0 0 30px ${glowColor}10`,
                 }}
               >
                 <div className="absolute inset-0 bg-slate-950/50 z-0" />
+                
                 <div className="relative z-10 flex justify-between items-start">
-                  <span className="px-2 py-0.5 rounded bg-white/10 text-[9px] font-bold text-white border border-white/5">
+                  <span className="px-2 py-0.5 rounded bg-white/10 text-sm font-bold text-white border border-white/5">
                     SmartMovie
                   </span>
                   {movie.imdb_score > 0 && (
-                    <div className="flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded border border-white/10 text-amber-400 text-[10px] font-bold">
-                      <Star className="w-3 h-3 fill-amber-400" />
+                    <div className="flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded border border-white/10 text-amber-400 text-sm font-bold">
+                      <Star className="w-5 h-5 fill-amber-400" />
                       {formatIMDBScore(movie.imdb_score)}
                     </div>
                   )}
@@ -262,7 +256,7 @@ export default function MovieDetailPage() {
               {/* Status */}
               <div className="mt-auto pt-4">
                 {recommendations.length > 0 ? (
-                  <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-semibold">
+                  <div className="flex items-center gap-2 px-6 py-3 max-w-md rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-semibold">
                     <Sparkles className="w-4 h-4" />
                     {recommendations.length} rekomendasi film serupa untukmu
                   </div>
