@@ -18,7 +18,7 @@ export const getMovies = async ({ page, limit, offset, search }) => {
   if (search) {
     const q = `%${search}%`;
     moviesRes = await query(`
-      SELECT movie_id, title, genres, actors, overview, imdb_rating, year
+      SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
       FROM movies
       WHERE title ILIKE $1 OR genres ILIKE $1 OR actors ILIKE $1
       ORDER BY imdb_rating DESC NULLS LAST LIMIT $2 OFFSET $3
@@ -30,7 +30,7 @@ export const getMovies = async ({ page, limit, offset, search }) => {
     `, [q]);
   } else {
     moviesRes = await query(`
-      SELECT movie_id, title, genres, actors, overview, imdb_rating, year
+      SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
       FROM movies
       ORDER BY imdb_rating DESC NULLS LAST LIMIT $1 OFFSET $2
     `, [limit, offset]);
@@ -40,8 +40,15 @@ export const getMovies = async ({ page, limit, offset, search }) => {
 
   const total = parseInt(totalRes.rows[0].count);
 
+  const BASE_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
+
+  const moviesWithImages = moviesRes.rows.map(movie => ({
+    ...movie,
+    poster_url: movie.poster_path ? `${BASE_IMAGE_URL}${movie.poster_path}` : null
+  }));
+
   return {
-    movies: moviesRes.rows,
+    movies: moviesWithImages,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) }
   };
 };
@@ -51,7 +58,7 @@ export const getMovies = async ({ page, limit, offset, search }) => {
  */
 export const getMovieById = async (movieId) => {
   const movieRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year
+    SELECT movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year, poster_path
     FROM movies WHERE movie_id = $1
   `, [movieId]);
 
@@ -67,7 +74,7 @@ export const getMovieById = async (movieId) => {
  */
 export const findMovieByTitle = async (searchTitle) => {
   const movieRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, year
+    SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
     FROM movies
     WHERE title ILIKE $1
     ORDER BY 
@@ -88,7 +95,7 @@ export const findMovieByTitle = async (searchTitle) => {
  */
 export const getTopByGenre = async (genre, limit = 10) => {
   const moviesRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, year
+    SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
     FROM movies
     WHERE genres ILIKE $1
     ORDER BY imdb_rating DESC NULLS LAST
@@ -133,7 +140,7 @@ export const getUserRecommendations = async (userId, limit = 10) => {
   params.push(limit);
 
   const moviesRes = await query(`
-    SELECT DISTINCT m.movie_id, m.title, m.genres, m.actors, m.overview, m.imdb_rating, m.year
+    SELECT DISTINCT m.movie_id, m.title, m.genres, m.actors, m.overview, m.imdb_rating, m.year, m.poster_path
     FROM movies m
     WHERE m.genres ILIKE ANY(ARRAY[${placeholders}])
     ORDER BY m.imdb_rating DESC NULLS LAST

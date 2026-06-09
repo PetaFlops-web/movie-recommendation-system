@@ -48,6 +48,7 @@ export const initDB = async () => {
         id SERIAL PRIMARY KEY,
         movie_id INTEGER UNIQUE NOT NULL,
         title VARCHAR(255) NOT NULL,
+        poster_path VARCHAR(255),
         genres TEXT,
         actors TEXT,
         overview TEXT,

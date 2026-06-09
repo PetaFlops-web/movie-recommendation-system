@@ -5,17 +5,7 @@ const PORT = parseInt(process.env.PORT) || 3000;
 
 // Start server - Railway requires listening on the PORT env var
 const server = app.listen(PORT, () => {
-  console.log('');
-  console.log('╔════════════════════════════════════════════════════════╗');
-  console.log('║   🎬 SMART MOVIE RECOMMENDATION SYSTEM                ║');
-  console.log('║   Team: PJK-GM059                                     ║');
-  console.log('╚════════════════════════════════════════════════════════╝');
-  console.log('');
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API: http://localhost:${PORT}`);
-  console.log(`🏥 Health: http://localhost:${PORT}/api/health`);
-  console.log('');
+  console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
 
 server.on('error', (e) => {
@@ -25,17 +15,17 @@ server.on('error', (e) => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('📴 SIGTERM received, shutting down gracefully...');
+  console.log('SIGTERM received, shutting down gracefully...');
   server.close(() => {
-    console.log('✅ Process terminated');
+    console.log('Process terminated');
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('📴 SIGINT received, shutting down...');
+  console.log('SIGINT received, shutting down...');
   server.close(() => {
-    console.log('✅ Process terminated');
+    console.log('Process terminated');
     process.exit(0);
   });
 });

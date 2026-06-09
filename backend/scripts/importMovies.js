@@ -23,7 +23,7 @@ function parseDate(dateStr) {
 
     // Check if date is valid
     if (isNaN(date.getTime())) {
-      console.warn(`⚠️  Could not parse date: "${dateStr}", using NULL`);
+      console.warn(`Could not parse date: "${dateStr}", using NULL`);
       return null;
     }
 
@@ -34,7 +34,7 @@ function parseDate(dateStr) {
 
     return `${year}-${month}-${day}`;
   } catch (err) {
-    console.warn(`⚠️  Error parsing date "${dateStr}":`, err.message);
+    console.warn(`Error parsing date "${dateStr}":`, err.message);
     return null;
   }
 }
@@ -43,11 +43,11 @@ async function importMovies() {
   try {
     await initDB();
     if (!fs.existsSync(CSV_PATH)) {
-      console.error(`❌ CSV file not found at ${CSV_PATH}`);
+      console.error(`CSV file not found at ${CSV_PATH}`);
       process.exit(1);
     }
 
-    console.log(`📥 Reading CSV from: ${CSV_PATH}`);
+    console.log(`Reading CSV from: ${CSV_PATH}`);
     const movies = [];
     let rowNum = 0;
 
