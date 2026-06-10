@@ -7,6 +7,7 @@ import {
   saveAuth,
   removeToken,
   getToken,
+  updateStoredUser,
   type User,
 } from '../lib/auth';
 
@@ -17,6 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   loginSuccess: (data: { user: User; preferences: string[]; token: string }) => void;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   loginSuccess: () => {},
   logout: () => {},
+  updateUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -57,6 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPreferences([]);
   }, []);
 
+  const updateUser = useCallback((updates: Partial<User>) => {
+    const updated = updateStoredUser(updates);
+    if (updated) setUser(updated);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -66,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         loginSuccess,
         logout,
+        updateUser,
       }}
     >
       {children}

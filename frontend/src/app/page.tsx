@@ -338,14 +338,14 @@ export default function Home() {
 
           {/* User Info + Logout - Beri shrink-0 */}
           <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-2">
+            <Link href="/profile" className="hidden sm:flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-brand-300/15 border border-brand-300/25 flex items-center justify-center">
                 <span className="text-xs font-bold text-brand-300">
                   {user?.username?.charAt(0).toUpperCase() || 'U'}
                 </span>
               </div>
               <span className="text-sm font-semibold text-slate-300">{user?.username || 'User'}</span>
-            </div>
+            </Link>
             <button
               onClick={handleLogout}
               // Padding sedikit diperkecil di mobile

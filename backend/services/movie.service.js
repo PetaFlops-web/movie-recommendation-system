@@ -66,7 +66,14 @@ export const getMovieById = async (movieId) => {
     return null;
   }
 
-  return movieRes.rows[0];
+  const movies = movieRes.rows[0];
+
+  const BASE_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
+  
+  return {
+    ...movies,
+    poster_url: movies.poster_path ? `${BASE_IMAGE_URL}${movies.poster_path}` : null
+  };
 };
 
 /**

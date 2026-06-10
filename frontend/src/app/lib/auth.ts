@@ -66,6 +66,15 @@ export function saveAuth(data: AuthResponse['data']): void {
   localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(data.preferences));
 }
 
+export function updateStoredUser(updates: Partial<User>): User | null {
+  if (typeof window === 'undefined') return null;
+  const current = getSavedUser();
+  if (!current) return null;
+  const updated = { ...current, ...updates };
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+}
+
 // ============================================================
 // API Functions
 // ============================================================

@@ -1,4 +1,4 @@
-import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse } from '@/types/movieType';
+import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse, Comment, UserProfile } from '@/types/movieType';
 
 // ============================================================
 // API Configuration — reads from .env (NEXT_PUBLIC_API_URL)
@@ -139,6 +139,7 @@ export async function fetchMovieDetail(
         const json = await safeJsonParse(res) as Record<string, unknown>;
         const data = json?.data as Record<string, unknown> | undefined;
         const movie = mapMovie((data?.movie as Record<string, unknown>) || found);
+        console.log('Movie detail API response:', { data });
         const recommendations = ((data?.recommendations as Record<string, unknown>[]) || []).map(mapRecommendation);
         return {
           success: true,
@@ -157,4 +158,126 @@ export async function fetchMovieDetail(
     movie: found,
     recommendations: [],
   };
+}
+
+// ============================================================
+// Profile API Functions
+// ============================================================
+
+export async function fetchProfile(userId: number): Promise<UserProfile> {
+  const res = await safeFetch(`${API_BASE}/users/${userId}/profile`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Gagal memuat profil (HTTP ${res.status})`);
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  return json?.data as UserProfile;
+}
+
+export async function updateProfile(
+  userId: number,
+  data: { display_name?: string; bio?: string; location?: string }
+): Promise<UserProfile> {
+  const res = await safeFetch(`${API_BASE}/users/${userId}/profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Gagal memperbarui profil (HTTP ${res.status})`);
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  return json?.data as UserProfile;
+}
+
+export async function deleteAccount(userId: number): Promise<void> {
+  const res = await safeFetch(`${API_BASE}/users/${userId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Gagal menghapus akun (HTTP ${res.status})`);
+  }
+}
+
+// ============================================================
+// Social API Functions
+// ============================================================
+
+export async function getComments(movieId: number): Promise<{ comments: Comment[]; total: number }> {
+  const res = await safeFetch(`${API_BASE}/movies/${movieId}/comments`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Gagal memuat komentar (HTTP ${res.status})`);
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  const data = json?.data as Record<string, unknown>;
+  return {
+    comments: (data?.comments as Comment[]) || [],
+    total: (data?.total as number) || 0,
+  };
+}
+
+export async function addComment(
+  movieId: number,
+  userId: number,
+  content: string
+): Promise<Comment> {
+  const res = await safeFetch(`${API_BASE}/movies/${movieId}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, content }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || 'Gagal menambahkan komentar');
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  return json?.data as Comment;
+}
+
+export async function getLikes(movieId: number): Promise<{ total_likes: number }> {
+  const res = await safeFetch(`${API_BASE}/movies/${movieId}/likes`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Gagal memuat likes (HTTP ${res.status})`);
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  return json?.data as { total_likes: number };
+}
+
+export async function toggleLike(
+  movieId: number,
+  userId: number
+): Promise<{ liked: boolean }> {
+  const res = await safeFetch(`${API_BASE}/movies/${movieId}/like`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || 'Gagal memproses like');
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  return json?.data as { liked: boolean };
+}
+
+export async function shareMovie(
+  movieId: number,
+  userId: number,
+  platform: string
+): Promise<{ shared: boolean }> {
+  const res = await safeFetch(`${API_BASE}/movies/${movieId}/share`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, platform }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || 'Gagal share movie');
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  return json?.data as { shared: boolean };
 }
