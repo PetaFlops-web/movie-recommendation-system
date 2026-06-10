@@ -3,31 +3,16 @@ import "dotenv/config";
 
 const { Pool } = pg;
 
-// Railway PostgreSQL requires SSL in production
-const isProduction = process.env.DATABASE_URL && process.env.NODE_ENV !== 'development';
+// Declare pool here so it can be assigned inside the environment blocks below
+let pool; 
 
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? {
-        connectionString: process.env.DATABASE_URL,
-        ssl: isProduction ? { rejectUnauthorized: false } : false,
-      }
-    : {
-        user: process.env.DB_USER,
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        password: process.env.DB_PASSWORD,
-        port: parseInt(process.env.DB_PORT) || 5432,
-      },
-);
-
-// === DETECT ENVIRONMENT ===
+// === DETECT ENVIRONMENT & INITIALIZE POOL ===
 if (process.env.DATABASE_URL) {
   // ✅ PRODUCTION (Neon.tech / Railway / Koyeb)
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
-      rejectUnauthorized: false // Wajib untuk Neon.tech
+      rejectUnauthorized: false // Required for platforms like Neon.tech/Railway
     }
   });
   console.log('🔗 Using DATABASE_URL (Production mode)');
@@ -40,7 +25,7 @@ if (process.env.DATABASE_URL) {
     password: process.env.DB_PASSWORD,
     port: parseInt(process.env.DB_PORT) || 5432,
   });
-  console.log(' Using local DB config (Development mode)');
+  console.log('💻 Using local DB config (Development mode)');
 }
 
 // === INIT DATABASE ===
