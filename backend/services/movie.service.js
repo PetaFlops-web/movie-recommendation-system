@@ -1,5 +1,31 @@
 import { query } from '../config/database.js';
 
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+
+/**
+ * ✅ FIX: Fungsi helper untuk memastikan poster_url menghasilkan link lengkap yang valid
+ */
+const addPosterUrl = (movie) => {
+  if (!movie) return movie;
+
+  let finalUrl = null;
+
+  // 1. Jika poster_url di DB sudah berupa link lengkap (http/https), gunakan langsung
+  if (movie.poster_url && (movie.poster_url.startsWith('http://') || movie.poster_url.startsWith('https://'))) {
+    finalUrl = movie.poster_url;
+  } 
+  // 2. Jika tidak, gabungkan base URL TMDB dengan poster_path (atau poster_url yang masih berupa path pendek)
+  else {
+    const path = movie.poster_path || movie.poster_url;
+    finalUrl = path ? `${TMDB_IMAGE_BASE}${path}` : null;
+  }
+
+  return {
+    ...movie,
+    poster_url: finalUrl
+  };
+};
+
 /**
  * Parse pagination from request query params
  */
@@ -18,7 +44,7 @@ export const getMovies = async ({ page, limit, offset, search }) => {
   if (search) {
     const q = `%${search}%`;
     moviesRes = await query(`
-      SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+      SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path, poster_url
       FROM movies
       WHERE title ILIKE $1 OR genres ILIKE $1 OR actors ILIKE $1
       ORDER BY imdb_rating DESC NULLS LAST LIMIT $2 OFFSET $3
@@ -30,7 +56,7 @@ export const getMovies = async ({ page, limit, offset, search }) => {
     `, [q]);
   } else {
     moviesRes = await query(`
-      SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+      SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path, poster_url
       FROM movies
       ORDER BY imdb_rating DESC NULLS LAST LIMIT $1 OFFSET $2
     `, [limit, offset]);
@@ -40,12 +66,7 @@ export const getMovies = async ({ page, limit, offset, search }) => {
 
   const total = parseInt(totalRes.rows[0].count);
 
-  const BASE_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-
-  const moviesWithImages = moviesRes.rows.map(movie => ({
-    ...movie,
-    poster_url: movie.poster_path ? `${BASE_IMAGE_URL}${movie.poster_path}` : null
-  }));
+  const moviesWithImages = moviesRes.rows.map(addPosterUrl);
 
   return {
     movies: moviesWithImages,
@@ -54,19 +75,19 @@ export const getMovies = async ({ page, limit, offset, search }) => {
 };
 
 /**
- * Get a single movie by ID
+ * ✅ FIX: Get a single movie by PRIMARY KEY ID (bukan movie_id)
  */
-export const getMovieById = async (movieId) => {
+export const getMovieById = async (id) => {
   const movieRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year, poster_path
-    FROM movies WHERE movie_id = $1
-  `, [movieId]);
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year, poster_path, poster_url
+    FROM movies WHERE id = $1
+  `, [id]);
 
   if (movieRes.rows.length === 0) {
     return null;
   }
 
-  return movieRes.rows[0];
+  return addPosterUrl(movieRes.rows[0]);
 };
 
 /**
@@ -74,7 +95,7 @@ export const getMovieById = async (movieId) => {
  */
 export const findMovieByTitle = async (searchTitle) => {
   const movieRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path, poster_url
     FROM movies
     WHERE title ILIKE $1
     ORDER BY 
@@ -87,7 +108,7 @@ export const findMovieByTitle = async (searchTitle) => {
     return null;
   }
 
-  return movieRes.rows[0];
+  return addPosterUrl(movieRes.rows[0]);
 };
 
 /**
@@ -95,14 +116,14 @@ export const findMovieByTitle = async (searchTitle) => {
  */
 export const getTopByGenre = async (genre, limit = 10) => {
   const moviesRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path, poster_url
     FROM movies
     WHERE genres ILIKE $1
     ORDER BY imdb_rating DESC NULLS LAST
     LIMIT $2
   `, [`%${genre}%`, limit]);
 
-  return moviesRes.rows;
+  return moviesRes.rows.map(addPosterUrl);
 };
 
 /**
@@ -114,18 +135,18 @@ export const getByMultipleGenres = async (genreArray, limit = 10) => {
   params.push(parseInt(limit));
 
   const moviesRes = await query(`
-    SELECT DISTINCT movie_id, title, genres, actors, overview, imdb_rating, year
+    SELECT DISTINCT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path, poster_url
     FROM movies
     WHERE genres ILIKE ANY(ARRAY[${placeholders}])
     ORDER BY imdb_rating DESC NULLS LAST
     LIMIT $${params.length}
   `, params);
 
-  return moviesRes.rows;
+  return moviesRes.rows.map(addPosterUrl);
 };
 
 /**
- * Get user genre preferences and recommend movies based on them
+ * ✅ FIX: Get user recommendations dengan poster_url yang sudah valid berbentuk link
  */
 export const getUserRecommendations = async (userId, limit = 10) => {
   const prefsRes = await query('SELECT genre FROM user_preferences WHERE user_id = $1', [userId]);
@@ -140,17 +161,20 @@ export const getUserRecommendations = async (userId, limit = 10) => {
   params.push(limit);
 
   const moviesRes = await query(`
-    SELECT DISTINCT m.movie_id, m.title, m.genres, m.actors, m.overview, m.imdb_rating, m.year, m.poster_path
+    SELECT DISTINCT m.id, m.movie_id, m.title, m.genres, m.actors, m.overview, m.imdb_rating, m.year, m.poster_path, m.poster_url
     FROM movies m
     WHERE m.genres ILIKE ANY(ARRAY[${placeholders}])
     ORDER BY m.imdb_rating DESC NULLS LAST
     LIMIT $${params.length}
   `, params);
 
+  // Mengubah data dengan helper yang baru
+  const recommendations = moviesRes.rows.map(addPosterUrl);
+
   return {
     user_id: userId,
     user_preferences: preferredGenres,
-    recommendations: moviesRes.rows,
-    total: moviesRes.rows.length
+    recommendations: recommendations,
+    total: recommendations.length
   };
 };

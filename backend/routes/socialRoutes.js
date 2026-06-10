@@ -8,6 +8,7 @@ const router = Router();
 /**
  * POST /api/movies/:movieId/comments
  * Add comment to movie
+ * ✅ FIX: Fetch user data & merge ke response agar username/display_name tidak null
  */
 router.post('/movies/:movieId/comments', async (req, res) => {
   try {
@@ -16,30 +17,46 @@ router.post('/movies/:movieId/comments', async (req, res) => {
     const userId = req.body.user_id || 1; // TODO: Ganti dengan req.user.id
 
     // Validasi komentar
-    const validation = validateComment(content);
-    if (!validation.valid) {
-      return errorResponse(res, validation.message, 400);
+    if (validateComment) {
+      const validation = validateComment(content);
+      if (!validation.valid) {
+        return errorResponse(res, validation.message, 400);
+      }
     }
 
-    // Check movie exists
-    const movieCheck = await query('SELECT movie_id FROM movies WHERE movie_id = $1 OR id = $1', [movieId]);
+    // Check movie exists (pakai id primary key)
+    const movieCheck = await query('SELECT id FROM movies WHERE id = $1', [movieId]);
     if (movieCheck.rows.length === 0) {
       return errorResponse(res, 'Film tidak ditemukan', 404);
     }
 
-    // Get user display name
-    const userRes = await query('SELECT display_name, username FROM users WHERE id = $1', [userId]);
+    // ✅ FIX 1: Ambil data user sebelum insert comment
+    const userRes = await query(
+      'SELECT id, username, display_name FROM users WHERE id = $1',
+      [userId]
+    );
     const user = userRes.rows[0];
+    
+    if (!user) {
+      return errorResponse(res, 'User tidak ditemukan', 404);
+    }
 
-    // Insert comment
+    // Insert comment (HANYA simpan user_id → normalisasi DB)
     const result = await query(
-      `INSERT INTO comments (user_id, movie_id, content, rating, display_name, username)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO comments (user_id, movie_id, content, rating)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [userId, movieId, content, rating || null, user?.display_name, user?.username]
+      [userId, movieId, content, rating || null]
     );
 
-    return successResponse(res, result.rows[0], 'Komentar berhasil ditambahkan', 201);
+    // ✅ FIX 2: Gabungkan data comment + user info untuk response
+    const responseData = {
+      ...result.rows[0],
+      username: user.username,
+      display_name: user.display_name || user.username // fallback kalau display_name kosong
+    };
+
+    return successResponse(res, responseData, 'Komentar berhasil ditambahkan', 201);
   } catch (err) {
     console.error('Add comment error:', err);
     return errorResponse(res, 'Gagal menambahkan komentar');
@@ -48,20 +65,30 @@ router.post('/movies/:movieId/comments', async (req, res) => {
 
 /**
  * GET /api/movies/:movieId/comments
- * Get all comments for a movie
+ * Get all comments for a movie (dengan JOIN user info)
  */
 router.get('/movies/:movieId/comments', async (req, res) => {
   try {
     const movieId = parseInt(req.params.movieId);
 
+    // Pakai JOIN untuk ambil user info saat GET
     const result = await query(
-      `SELECT * FROM comments 
-       WHERE movie_id = $1 OR movie_id IN (SELECT id FROM movies WHERE movie_id = $1)
-       ORDER BY created_at DESC`,
+      `SELECT 
+         c.id, c.content, c.rating, c.created_at,
+         c.user_id,
+         u.username, u.display_name
+       FROM comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       WHERE c.movie_id = $1
+       ORDER BY c.created_at DESC`,
       [movieId]
     );
 
-    return successResponse(res, { comments: result.rows, total: result.rows.length });
+    return successResponse(res, { 
+      movie_id: movieId,
+      comments: result.rows, 
+      total: result.rows.length 
+    });
   } catch (err) {
     console.error('Get comments error:', err);
     return errorResponse(res, 'Gagal mengambil komentar');
@@ -70,12 +97,12 @@ router.get('/movies/:movieId/comments', async (req, res) => {
 
 /**
  * POST /api/movies/:movieId/like
- * Like a movie
+ * Like a movie (toggle)
  */
 router.post('/movies/:movieId/like', async (req, res) => {
   try {
     const movieId = parseInt(req.params.movieId);
-    const userId = req.body.user_id || 1; // TODO: Ganti dengan req.user.id
+    const userId = req.body.user_id || 1;
 
     // Check if already liked
     const existing = await query(
@@ -84,7 +111,7 @@ router.post('/movies/:movieId/like', async (req, res) => {
     );
 
     if (existing.rows.length > 0) {
-      // Unlike
+      // Unlike - hapus by id primary key
       await query('DELETE FROM movie_likes WHERE id = $1', [existing.rows[0].id]);
       return successResponse(res, { liked: false }, 'Berhasil unlike movie');
     } else {
@@ -110,11 +137,14 @@ router.get('/movies/:movieId/likes', async (req, res) => {
     const movieId = parseInt(req.params.movieId);
 
     const result = await query(
-      'SELECT COUNT(*) as total_likes FROM movie_likes WHERE movie_id = $1 OR movie_id IN (SELECT id FROM movies WHERE movie_id = $1)',
+      'SELECT COUNT(*) as total_likes FROM movie_likes WHERE movie_id = $1',
       [movieId]
     );
 
-    return successResponse(res, { total_likes: parseInt(result.rows[0].total_likes) });
+    return successResponse(res, { 
+      movie_id: movieId,
+      total_likes: parseInt(result.rows[0].total_likes) 
+    });
   } catch (err) {
     console.error('Get likes error:', err);
     return errorResponse(res, 'Gagal mengambil jumlah like');

@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { pool } from "../config/database.js"
+// ✅ FIX 1: Tambah import initDB
+import { initDB, pool } from "../config/database.js";
 
 // 1. Fungsi khusus untuk menembak API TMDB berdasarkan judul
 async function getPosterFromTMDB(title) {
@@ -30,9 +31,12 @@ async function syncPostersToDB() {
   console.log("🚀 Memulai proses sinkronisasi poster...");
   
   try {
-    // A. Ambil data dari DB yang poster_path-nya masih kosong
+    // ✅ FIX 2: Init DB dulu sebelum pakai pool!
+    await initDB();
+    
+    // ✅ FIX 3: Ganti poster_path → poster_url (sesuai struktur DB kita)
     const { rows: moviesMissingPosters } = await pool.query(
-      "SELECT id, title FROM movies WHERE poster_path IS NULL"
+      "SELECT id, title FROM movies WHERE poster_url IS NULL"
     );
     
     if (moviesMissingPosters.length === 0) {
@@ -47,9 +51,9 @@ async function syncPostersToDB() {
       const posterPath = await getPosterFromTMDB(movie.title);
 
       if (posterPath) {
-        // C. Update Database
+        // ✅ FIX 4: Update kolom poster_url, bukan poster_path
         await pool.query(
-          "UPDATE movies SET poster_path = $1 WHERE id = $2", 
+          "UPDATE movies SET poster_url = $1 WHERE id = $2", 
           [posterPath, movie.id]
         );
         console.log(`✅ Update berhasil: "${movie.title}"`);
@@ -65,8 +69,10 @@ async function syncPostersToDB() {
   } catch (error) {
     console.error('❌ Terjadi kesalahan pada proses sinkronisasi:', error);
   } finally {
-    // Menutup koneksi pool jika ini adalah script sekali jalan
-    await pool.end();
+    // ✅ FIX 5: Cek pool sebelum close (biar tidak error kalau undefined)
+    if (pool) {
+      await pool.end();
+    }
   }
 }
 

@@ -3,56 +3,50 @@ import "dotenv/config";
 
 const { Pool } = pg;
 
-// Railway PostgreSQL requires SSL in production
-const isProduction = process.env.DATABASE_URL && process.env.NODE_ENV !== 'development';
+// === 🗄️ DATABASE POOL INITIALIZATION ===
+// Gunakan let agar bisa di-assign nanti
+let pool;
 
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? {
-        connectionString: process.env.DATABASE_URL,
-        ssl: isProduction ? { rejectUnauthorized: false } : false,
-      }
-    : {
-        user: process.env.DB_USER,
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
-        password: process.env.DB_PASSWORD,
-        port: parseInt(process.env.DB_PORT) || 5432,
-      },
-);
-
-// === DETECT ENVIRONMENT ===
-if (process.env.DATABASE_URL) {
-  // ✅ PRODUCTION (Neon.tech / Railway / Koyeb)
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false // Wajib untuk Neon.tech
-    }
-  });
-  console.log('🔗 Using DATABASE_URL (Production mode)');
-} else {
-  // ✅ LOCAL DEVELOPMENT
-  pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: parseInt(process.env.DB_PORT) || 5432,
-  });
-  console.log(' Using local DB config (Development mode)');
-}
-
-// === INIT DATABASE ===
 export const initDB = async () => {
   try {
+    // Cek environment: Production (Railway/Neon) atau Local
+    const isProduction = process.env.DATABASE_URL && process.env.NODE_ENV !== 'development';
+
+    if (process.env.DATABASE_URL) {
+      // ✅ PRODUCTION: Pakai CONNECTION STRING + SSL
+      pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: isProduction ? { rejectUnauthorized: false } : false,
+      });
+      console.log('🔗 Using DATABASE_URL (Production mode)');
+    } else {
+      // ✅ DEVELOPMENT: Pakai individual env vars
+      pool = new Pool({
+        user: process.env.DB_USER || 'postgres',
+        host: process.env.DB_HOST || 'localhost',
+        database: process.env.DB_NAME || 'smart_movie_db',
+        password: process.env.DB_PASSWORD || '',
+        port: parseInt(process.env.DB_PORT) || 5432,
+      });
+      console.log('🔗 Using local DB config (Development mode)');
+    }
+
+    // Test koneksi
+    await pool.query('SELECT NOW()');
+    console.log('✅ PostgreSQL connected successfully');
+
+    // === 🏗️ CREATE TABLES IF NOT EXISTS ===
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL,
         email VARCHAR(100) UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        display_name VARCHAR(100),
+        bio TEXT,
+        location VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -84,7 +78,6 @@ export const initDB = async () => {
       )
     `);
 
-    // Table for tracking user-movie interactions (watched/rated)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_movies (
         id SERIAL PRIMARY KEY,
@@ -98,7 +91,6 @@ export const initDB = async () => {
       )
     `);
 
-    // Table for storing recommendations
     await pool.query(`
       CREATE TABLE IF NOT EXISTS recommendations (
         id SERIAL PRIMARY KEY,
@@ -110,7 +102,45 @@ export const initDB = async () => {
       )
     `);
 
-    // Create indexes for better performance
+    // === 💬 SOCIAL FEATURES TABLES ===
+    
+    // Comments table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comments (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        movie_id INTEGER REFERENCES movies(movie_id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        rating INTEGER CHECK (rating >= 1 AND rating <= 10),
+        display_name VARCHAR(100),
+        username VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Likes table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS movie_likes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        movie_id INTEGER REFERENCES movies(movie_id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, movie_id)
+      )
+    `);
+
+    // Shares table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS movie_shares (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        movie_id INTEGER REFERENCES movies(movie_id) ON DELETE CASCADE,
+        platform VARCHAR(50) DEFAULT 'direct',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // === 📊 INDEXES FOR PERFORMANCE ===
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_movies_title ON movies(title);
       CREATE INDEX IF NOT EXISTS idx_movies_genres ON movies USING gin(to_tsvector('english', genres));
@@ -119,15 +149,39 @@ export const initDB = async () => {
       CREATE INDEX IF NOT EXISTS idx_user_movies_user ON user_movies(user_id);
       CREATE INDEX IF NOT EXISTS idx_user_movies_movie ON user_movies(movie_id);
       CREATE INDEX IF NOT EXISTS idx_recommendations_user ON recommendations(user_id);
-      CREATE INDEX IF NOT EXISTS idx_recommendations_type ON recommendations(recommendation_type);
+      CREATE INDEX IF NOT EXISTS idx_comments_movie ON comments(movie_id);
+      CREATE INDEX IF NOT EXISTS idx_likes_movie ON movie_likes(movie_id);
     `);
 
-    console.log("✅ PostgreSQL & tables initialized successfully");
+    console.log("✅ All tables initialized successfully");
+    return pool;
+    
   } catch (err) {
-    console.error("❌ DB Init Error:", err);
+    console.error("❌ DB Init Error:", err.message);
+    throw err;
   }
 };
 
-export const query = (text, params) => pool.query(text, params);
+// === 📦 EXPORTS ===
 
+// Query helper (wajib pakai await)
+export const query = (text, params) => {
+  if (!pool) {
+    throw new Error('Database pool not initialized. Call initDB() first.');
+  }
+  return pool.query(text, params);
+};
+
+// Export pool untuk advanced usage (opsional)
+export const getPool = () => pool;
+
+// ✅ EXPORT POOL LANGSUNG AGAR BISA DI-IMPORT DI SCRIPTS
 export { pool };
+
+// Graceful shutdown
+export const closeDB = async () => {
+  if (pool) {
+    await pool.end();
+    console.log('✅ Database connection closed');
+  }
+};

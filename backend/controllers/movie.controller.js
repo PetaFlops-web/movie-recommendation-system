@@ -8,7 +8,7 @@ import {
   getByMultipleGenres,
   getUserRecommendations
 } from '../services/movie.service.js';
-import { getContentBasedRecommendations, handleMLError } from '../services/ml.service.js';
+import { getContentBasedRecommendations } from '../services/ml.service.js';
 
 /**
  * GET /api/movies
@@ -47,7 +47,8 @@ export const movieDetail = async (req, res) => {
     let recommendations = [];
     try {
       const mlResult = await getContentBasedRecommendations(movie.movie_id, movie.title, 10);
-      recommendations = mlResult.recommendations || mlResult.data || [];
+      // ✅ FIX: Ambil data recommendations dengan aman
+      recommendations = mlResult?.recommendations || mlResult?.data?.recommendations || mlResult?.data || [];
     } catch (mlError) {
       console.error('ML Service error for detail:', mlError.message);
       // Tetap return movie detail meski ML gagal
@@ -63,6 +64,7 @@ export const movieDetail = async (req, res) => {
 /**
  * GET /api/movies/recommendations/similar/:title
  * Input 1 judul film -> dapatkan 10 film paling mirip (Content-Based)
+ * ✅ FIX: Handling response Python ML Service yang benar
  */
 export const similarMovies = async (req, res) => {
   try {
@@ -71,13 +73,43 @@ export const similarMovies = async (req, res) => {
       return errorResponse(res, 'Judul film tidak boleh kosong', 400);
     }
 
+    // 1. Cari movie di database lokal
     const foundMovie = await findMovieByTitle(searchTitle);
     if (!foundMovie) {
       return errorResponse(res, `Film "${searchTitle}" tidak ditemukan di database`, 404);
     }
 
+    // 2. Panggil ML Service
     const mlResult = await getContentBasedRecommendations(foundMovie.movie_id, foundMovie.title, 10);
 
+    // ✅ FIX: Extract recommendations dari berbagai kemungkinan struktur response
+    const recommendations = 
+      mlResult?.recommendations || 
+      mlResult?.data?.recommendations || 
+      mlResult?.data || 
+      [];
+
+    // 3. Jika ML return data kosong, fallback ke genre-based
+    if (recommendations.length === 0) {
+      console.log('⚠️ Fallback to genre-based recommendations');
+      const genreArray = foundMovie.genres?.split(',').map(g => g.trim()) || [];
+      if (genreArray.length > 0) {
+        const fallback = await getByMultipleGenres(genreArray, 10);
+        return successResponse(res, {
+          input_movie: {
+            movie_id: foundMovie.movie_id,
+            title: foundMovie.title,
+            genres: foundMovie.genres,
+            imdb_rating: foundMovie.imdb_rating
+          },
+          recommendations: fallback,
+          total_similar: fallback.length,
+          note: 'Rekomendasi berbasis genre (fallback)'
+        });
+      }
+    }
+
+    // 4. Return hasil sukses
     return successResponse(res, {
       input_movie: {
         movie_id: foundMovie.movie_id,
@@ -85,12 +117,13 @@ export const similarMovies = async (req, res) => {
         genres: foundMovie.genres,
         imdb_rating: foundMovie.imdb_rating
       },
-      recommendations: mlResult.recommendations || mlResult.data || [],
-      total_similar: mlResult.recommendations?.length || 0
+      recommendations: recommendations,
+      total_similar: recommendations.length
     });
+
   } catch (err) {
     console.error('Similar movie error:', err);
-    return errorResponse(res, 'Gagal mendapatkan rekomendasi film mirip', 500, err.message);
+    return errorResponse(res, 'Gagal mendapatkan rekomendasi film mirip', 500);
   }
 };
 
@@ -133,10 +166,7 @@ export const recommendByGenre = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 10;
 
     if (isNaN(limit) || limit <= 0) {
-      return res.status(400).json({ // Sesuaikan dengan fungsi errorResponse kamu
-        success: false,
-        message: 'Parameter limit harus berupa angka positif'
-      });
+      return errorResponse(res, 'Parameter limit harus berupa angka positif', 400);
     }
 
     if (!genres) {
