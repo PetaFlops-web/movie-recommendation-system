@@ -1,4 +1,5 @@
 export interface MovieFromAPI {
+  id?: number;
   movie_id?: number;
   title: string;
   genre: string;
@@ -8,6 +9,7 @@ export interface MovieFromAPI {
   imdb_rating?: string | number;
   year: string;
   poster_url?: string;
+  poster_path?: string;
   runtime?: number;
   language?: string;
   premiere?: string;
@@ -15,6 +17,11 @@ export interface MovieFromAPI {
 
 export interface MovieWithSimilarity extends MovieFromAPI {
   similarity_score: number;
+}
+
+export interface RecommendationsByCategory {
+  hybrid: MovieWithSimilarity[];
+  tfidf: MovieWithSimilarity[];
 }
 
 export interface MoviesResponse {
@@ -29,7 +36,7 @@ export interface MoviesResponse {
 export interface MovieDetailResponse {
   success: boolean;
   movie: MovieFromAPI;
-  recommendations: MovieWithSimilarity[];
+  recommendations: RecommendationsByCategory;
 }
 
 export interface HealthResponse {

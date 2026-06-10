@@ -1,4 +1,5 @@
 import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse, Comment, UserProfile } from '@/types/movieType';
+import { getToken, removeToken } from './auth';
 
 // ============================================================
 // API Configuration — reads from .env (NEXT_PUBLIC_API_URL)
@@ -50,7 +51,7 @@ function mapRecommendation(raw: Record<string, unknown>): MovieWithSimilarity {
 }
 
 // ============================================================
-// Fetch Helper with Error Handling
+// Fetch Helpers with Error Handling
 // ============================================================
 
 async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
@@ -59,6 +60,25 @@ async function safeFetch(url: string, options?: RequestInit): Promise<Response> 
     res = await fetch(url, options);
   } catch {
     throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+  }
+  return res;
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
+async function authFetch(url: string, options?: RequestInit): Promise<Response> {
+  const headers = {
+    ...authHeaders(),
+    ...(options?.headers || {}),
+  };
+  const res = await safeFetch(url, { ...options, headers });
+  if (res.status === 401 && typeof window !== 'undefined') {
+    removeToken();
+    window.location.href = '/login';
   }
   return res;
 }
@@ -75,7 +95,7 @@ async function safeJsonParse(res: Response): Promise<Record<string, unknown>> {
 }
 
 // ============================================================
-// Movie API Functions
+// Movie API Functions (Public)
 // ============================================================
 
 export async function fetchMovies(
@@ -121,7 +141,6 @@ export async function fetchMovies(
 export async function fetchMovieDetail(
   title: string
 ): Promise<MovieDetailResponse> {
-  // 1) Search film berdasarkan judul untuk mendapatkan movie_id
   const searchData = await fetchMovies(1, 5, title);
   const exactMatch = searchData.movies.find(
     (m) => m.title.toLowerCase() === title.toLowerCase()
@@ -140,7 +159,11 @@ export async function fetchMovieDetail(
         const data = json?.data as Record<string, unknown> | undefined;
         const movie = mapMovie((data?.movie as Record<string, unknown>) || found);
         console.log('Movie detail API response:', { data });
-        const recommendations = ((data?.recommendations as Record<string, unknown>[]) || []).map(mapRecommendation);
+        const rawRecs = (data?.recommendations as Record<string, unknown[]>) || {};
+        const recommendations = {
+          hybrid: ((rawRecs.hybrid as Record<string, unknown>[]) || []).map(mapRecommendation),
+          tfidf: ((rawRecs.tfidf as Record<string, unknown>[]) || []).map(mapRecommendation),
+        };
         return {
           success: true,
           movie,
@@ -148,15 +171,14 @@ export async function fetchMovieDetail(
         };
       }
     } catch {
-      // Jika gagal, fallback ke data dari search tanpa rekomendasi
+      // fallback to search data without recommendations
     }
   }
 
-  // 3) Fallback: film ada di database tapi tidak di ML dataset
   return {
     success: true,
     movie: found,
-    recommendations: [],
+    recommendations: { hybrid: [], tfidf: [] },
   };
 }
 
@@ -176,12 +198,12 @@ export async function fetchProfile(userId: number): Promise<UserProfile> {
 
 export async function updateProfile(
   userId: number,
-  data: { display_name?: string; bio?: string; location?: string }
+  username: string
 ): Promise<UserProfile> {
-  const res = await safeFetch(`${API_BASE}/users/${userId}/profile`, {
+  const res = await authFetch(`${API_BASE}/users/${userId}/profile`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ username }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
@@ -192,7 +214,7 @@ export async function updateProfile(
 }
 
 export async function deleteAccount(userId: number): Promise<void> {
-  const res = await safeFetch(`${API_BASE}/users/${userId}`, {
+  const res = await authFetch(`${API_BASE}/users/${userId}/profile`, {
     method: 'DELETE',
   });
   if (!res.ok) {
@@ -202,7 +224,37 @@ export async function deleteAccount(userId: number): Promise<void> {
 }
 
 // ============================================================
-// Social API Functions
+// Auth Preferences API Functions
+// ============================================================
+
+export async function getPreferences(): Promise<string[]> {
+  const res = await authFetch(`${API_BASE}/auth/preferences`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Gagal memuat preferensi (HTTP ${res.status})`);
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  const data = json?.data as Record<string, unknown> | undefined;
+  return (data?.preferences as string[]) || (data?.genres as string[]) || [];
+}
+
+export async function updatePreferences(genres: string[]): Promise<string[]> {
+  const res = await authFetch(`${API_BASE}/auth/preferences`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ genres }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || `Gagal memperbarui preferensi (HTTP ${res.status})`);
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  const data = json?.data as Record<string, unknown> | undefined;
+  return (data?.preferences as string[]) || (data?.genres as string[]) || genres;
+}
+
+// ============================================================
+// Social API Functions (Protected — requires Bearer token)
 // ============================================================
 
 export async function getComments(movieId: number): Promise<{ comments: Comment[]; total: number }> {
@@ -221,13 +273,16 @@ export async function getComments(movieId: number): Promise<{ comments: Comment[
 
 export async function addComment(
   movieId: number,
-  userId: number,
-  content: string
+  content: string,
+  rating?: number
 ): Promise<Comment> {
-  const res = await safeFetch(`${API_BASE}/movies/${movieId}/comments`, {
+  const body: Record<string, unknown> = { content };
+  if (rating !== undefined) body.rating = rating;
+
+  const res = await authFetch(`${API_BASE}/movies/${movieId}/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, content }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
@@ -247,14 +302,9 @@ export async function getLikes(movieId: number): Promise<{ total_likes: number }
   return json?.data as { total_likes: number };
 }
 
-export async function toggleLike(
-  movieId: number,
-  userId: number
-): Promise<{ liked: boolean }> {
-  const res = await safeFetch(`${API_BASE}/movies/${movieId}/like`, {
+export async function toggleLike(movieId: number): Promise<{ liked: boolean }> {
+  const res = await authFetch(`${API_BASE}/movies/${movieId}/like`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
@@ -266,18 +316,45 @@ export async function toggleLike(
 
 export async function shareMovie(
   movieId: number,
-  userId: number,
   platform: string
-): Promise<{ shared: boolean }> {
-  const res = await safeFetch(`${API_BASE}/movies/${movieId}/share`, {
+): Promise<{ shared: boolean; platform: string }> {
+  const res = await authFetch(`${API_BASE}/movies/${movieId}/share`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, platform }),
+    body: JSON.stringify({ platform }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.message || 'Gagal share movie');
   }
   const json = await safeJsonParse(res) as Record<string, unknown>;
-  return json?.data as { shared: boolean };
+  return json?.data as { shared: boolean; platform: string };
+}
+
+// ============================================================
+// Health Check API (Public)
+// ============================================================
+
+export interface HealthStatus {
+  api: string;
+  database: string;
+  ml_service: string;
+}
+
+export async function checkHealth(): Promise<HealthStatus> {
+  const res = await safeFetch(`${API_BASE}/health`);
+  if (!res.ok) {
+    throw new Error(`Health check gagal (HTTP ${res.status})`);
+  }
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  const data = json?.data as Record<string, unknown> | undefined;
+  const rawMl = data?.ml_service;
+  const mlStatus = typeof rawMl === 'object' && rawMl !== null
+    ? ((rawMl as Record<string, string>).status || 'unknown')
+    : (rawMl as string) || 'unknown';
+  return {
+    api: (data?.status as string) || 'unknown',
+    database: 'connected',
+    ml_service: mlStatus,
+  };
 }

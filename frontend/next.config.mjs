@@ -8,6 +8,7 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -18,11 +19,6 @@ const nextConfig = {
   },
   // Disable x-powered-by header for security
   poweredByHeader: false,
-
-  // Allow images from external domains if needed
-  images: {
-    unoptimized: true,
-  },
 };
 
 export default nextConfig;

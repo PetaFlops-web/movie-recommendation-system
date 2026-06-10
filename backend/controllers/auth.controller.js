@@ -1,5 +1,5 @@
 import { validationResult } from 'express-validator';
-import { registerUser, loginUser, updatePreferences } from '../services/auth.service.js';
+import { registerUser, loginUser, updatePreferences, getUserPreferences } from '../services/auth.service.js';
 import { successResponse, errorResponse } from '../utils/response.helper.js';
 
 /**
@@ -69,5 +69,21 @@ export const preferences = async (req, res) => {
   } catch (error) {
     console.error('Preferences error:', error);
     return errorResponse(res, 'Gagal menyimpan preferensi');
+  }
+};
+
+/**
+ * GET /api/auth/preferences
+ */
+export const getPreferences = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await getUserPreferences(userId);
+
+    return successResponse(res, result, 'Preferensi berhasil diambil');
+  } catch (error) {
+    console.error('Get preferences error:', error);
+    return errorResponse(res, 'Gagal mengambil preferensi');
   }
 };

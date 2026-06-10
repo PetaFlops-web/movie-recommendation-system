@@ -94,3 +94,16 @@ export const updatePreferences = async (userId, genres) => {
 
   return { genres };
 };
+
+/**
+ * Get user genre preferences
+ */
+export const getUserPreferences = async (userId) => {
+  const result = await query(
+    'SELECT genre FROM user_preferences WHERE user_id = $1 ORDER BY created_at',
+    [userId]
+  );
+
+  const genres = result.rows.map(row => row.genre);
+  return { user_id: userId, preferences: genres };
+};

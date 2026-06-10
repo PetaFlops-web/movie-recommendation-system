@@ -82,3 +82,45 @@ export const searchValidation = [
     .isInt({ min: 1 })
     .withMessage('Page harus lebih dari 0')
 ];
+
+/**
+ * Validate comment content
+ * @param {string} text - Comment text to validate
+ * @returns {Object} { valid: boolean, message: string }
+ */
+export const validateComment = (text) => {
+  if (!text || text.trim().length === 0) {
+    return { valid: false, message: 'Komentar tidak boleh kosong' };
+  }
+  if (text.trim().length < 10) {
+    return { valid: false, message: 'Komentar terlalu pendek (min. 10 karakter)' };
+  }
+
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  if (urlRegex.test(text)) {
+    return { valid: false, message: 'Komentar tidak boleh mengandung link' };
+  }
+
+  const chars = text.match(/[a-zA-Z]/g);
+  if (chars) {
+    const upperCount = chars.filter(c => c === c.toUpperCase()).length;
+    const ratio = upperCount / chars.length;
+    if (ratio > 0.8 && text.length > 10) {
+      return { valid: false, message: 'Mohon jangan gunakan Capslock berlebihan' };
+    }
+  }
+
+  if (/(.)\1{4,}/.test(text)) {
+    return { valid: false, message: 'Terdeteksi spam karakter berulang' };
+  }
+
+  const toxicWords = ['bodoh', 'goblok', 'anjing', 'babi', 'stupid', 'idiot', 'tolol', 'bangsat', 'jelek banget', 'buruk'];
+  const lowerText = text.toLowerCase();
+  const foundToxic = toxicWords.find(word => lowerText.includes(word));
+  
+  if (foundToxic) {
+    return { valid: false, message: 'Komentar mengandung kata yang tidak pantas' };
+  }
+
+  return { valid: true, message: 'Komentar aman' };
+};

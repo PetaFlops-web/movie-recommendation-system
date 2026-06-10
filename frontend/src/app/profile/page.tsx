@@ -17,10 +17,23 @@ import {
   AlertTriangle,
   AlertCircle,
   CheckCircle,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchProfile, updateProfile, deleteAccount } from '../lib/api';
+import {
+  fetchProfile,
+  updateProfile,
+  deleteAccount,
+  getPreferences,
+  updatePreferences,
+} from '../lib/api';
 import { UserProfile } from '@/types/movieType';
+
+const GENRE_LIST = [
+  'Drama', 'Comedy', 'Documentary', 'Thriller', 'Romance',
+  'Action', 'Horror', 'Crime', 'Animation', 'Sci-Fi',
+  'Mystery', 'Family', 'Adventure', 'Fantasy',
+];
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -40,6 +53,12 @@ export default function ProfilePage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Genre preferences state
+  const [preferences, setPreferences] = useState<string[]>([]);
+  const [isEditingPrefs, setIsEditingPrefs] = useState(false);
+  const [tempPrefs, setTempPrefs] = useState<string[]>([]);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace('/login');
@@ -48,20 +67,20 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user?.id) {
-      fetchProfile(user.id)
-        .then((data) => {
-          setProfile(data);
-          setEditValue(data.display_name || data.username);
-        })
-        .catch(() => {
-          setProfile({
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            display_name: user.username,
-            created_at: '',
-          });
-          setEditValue(user.username);
+      Promise.all([
+        fetchProfile(user.id).catch(() => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          display_name: user.username,
+          created_at: '',
+        })),
+        getPreferences().catch(() => []),
+      ])
+        .then(([profileData, prefsData]) => {
+          setProfile(profileData as UserProfile);
+          setEditValue((profileData as UserProfile).username);
+          setPreferences(prefsData);
         })
         .finally(() => setIsLoading(false));
     }
@@ -72,7 +91,7 @@ export default function ProfilePage() {
     setIsSaving(true);
     setErrorMsg(null);
     try {
-      const updated = await updateProfile(user.id, { display_name: editValue.trim() });
+      const updated = await updateProfile(user.id, editValue.trim());
       setProfile(updated);
       updateUser({ username: editValue.trim() });
       setIsEditing(false);
@@ -101,6 +120,37 @@ export default function ProfilePage() {
     }
   };
 
+  const toggleTempPref = (genre: string) => {
+    setTempPrefs((prev) =>
+      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
+    );
+  };
+
+  const handleStartEditPrefs = () => {
+    setTempPrefs([...preferences]);
+    setIsEditingPrefs(true);
+  };
+
+  const handleSavePrefs = async () => {
+    if (tempPrefs.length === 0) {
+      setErrorMsg('Pilih minimal 1 genre favorit');
+      return;
+    }
+    setIsSavingPrefs(true);
+    setErrorMsg(null);
+    try {
+      const updated = await updatePreferences(tempPrefs);
+      setPreferences(updated);
+      setIsEditingPrefs(false);
+      setSuccessMsg('Preferensi genre berhasil diperbarui');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Gagal memperbarui preferensi');
+    } finally {
+      setIsSavingPrefs(false);
+    }
+  };
+
   if (authLoading || !isAuthenticated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center cinematic-bg">
@@ -112,12 +162,11 @@ export default function ProfilePage() {
     );
   }
 
-  const displayName = profile?.display_name || user?.username || 'User';
+  const displayName = profile?.username || user?.username || 'User';
   const email = profile?.email || user?.email || '';
 
   return (
     <div className="relative min-h-screen z-10 selection:bg-brand-300/30 selection:text-brand-50 pb-20">
-      {/* Background */}
       <div className="cinematic-bg">
         <div className="glow-orb glow-orb-primary" />
         <div className="glow-orb glow-orb-secondary" />
@@ -239,7 +288,7 @@ export default function ProfilePage() {
                   <button
                     onClick={() => {
                       setIsEditing(false);
-                      setEditValue(profile?.display_name || user?.username || '');
+                      setEditValue(profile?.username || user?.username || '');
                     }}
                     className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/20 transition-all"
                   >
@@ -296,6 +345,106 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+        </motion.section>
+
+        {/* Genre Preferences Card */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+          className="glass-panel rounded-2xl p-6 sm:p-8 border border-white/5 mb-8"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-brand-300" />
+              Preferensi Genre
+            </h2>
+            {!isEditingPrefs && (
+              <button
+                onClick={handleStartEditPrefs}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 bg-white/[0.02] border border-white/5 hover:text-brand-300 hover:border-brand-300/30 flex items-center gap-1.5 transition-all"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </button>
+            )}
+          </div>
+
+          {isEditingPrefs ? (
+            <>
+              <p className="text-xs text-slate-400 mb-4">
+                Pilih genre film favoritmu untuk rekomendasi yang lebih personal.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-5">
+                {GENRE_LIST.map((genre) => (
+                  <button
+                    key={genre}
+                    type="button"
+                    onClick={() => toggleTempPref(genre)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                      tempPrefs.includes(genre)
+                        ? 'bg-brand-300 text-white border-brand-300 shadow-lg shadow-brand-300/20'
+                        : 'bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+              {tempPrefs.length > 0 && (
+                <p className="text-[10px] text-brand-300 font-medium mb-4">
+                  {tempPrefs.length} genre dipilih
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSavePrefs}
+                  disabled={isSavingPrefs || tempPrefs.length === 0}
+                  className="px-4 py-2 rounded-xl bg-brand-300 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-brand-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isSavingPrefs ? (
+                    <>
+                      <div className="loading-spinner border-white/30 border-t-white w-3.5 h-3.5" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Simpan
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsEditingPrefs(false)}
+                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-xs font-bold hover:text-white hover:border-white/20 transition-all"
+                >
+                  Batal
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {preferences.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {preferences.map((genre) => (
+                    <span
+                      key={genre}
+                      className="genre-pill px-3.5 py-1.5 rounded-full text-xs font-bold"
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <Sparkles className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">Belum ada preferensi genre.</p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Klik &ldquo;Edit&rdquo; untuk memilih genre favoritmu.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </motion.section>
 
         {/* Danger Zone */}

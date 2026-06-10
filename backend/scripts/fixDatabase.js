@@ -59,7 +59,7 @@ async function fixDatabase() {
     console.log('  ✅ Kolom runtime ditambahkan');
     
     await pool.query('ALTER TABLE movies ADD COLUMN IF NOT EXISTS language VARCHAR(100)');
-    console.log('  ✅ Kolom language ditambahkan');
+    console.log('Kolom language ditambahkan');
     
     // STEP 2: Update data dari CSV
     console.log('\n📥 Update data dari CSV...');

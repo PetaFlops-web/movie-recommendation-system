@@ -19,6 +19,7 @@ import Image from 'next/image';
 import { formatIMDBScore, parseGenres, encodeMovieTitle } from '@/helpers/jsosParser';
 import SkeletonCard from '@/components/SkeletonCard';
 import MovieCard from '@/components/card';
+import HealthIndicator from '@/components/HealthIndicator';
 import { fetchMovies } from './lib/api';
 import { useAuth } from './contexts/AuthContext';
 
@@ -700,6 +701,7 @@ export default function Home() {
             <span>•</span>
             <span>Platform Film & Rekomendasi</span>
           </div>
+          <HealthIndicator />
           <div>&copy; {new Date().getFullYear()} SmartMovie. Semua hak cipta dilindungi.</div>
         </div>
       </footer>

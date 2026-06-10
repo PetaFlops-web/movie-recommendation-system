@@ -1,5 +1,33 @@
 import { query } from '../config/database.js';
 
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+
+
+const addPosterUrl = (movie) => {
+  if (!movie) return movie;
+
+  let finalUrl = null;
+
+  const path = movie.poster_path
+
+  finalUrl = path ? `${TMDB_IMAGE_BASE}${path}` : null;
+
+  return {
+    ...movie,
+    poster_url: finalUrl
+  };
+};
+
+/**
+ * Helper untuk mengekstrak baris data dari database secara aman (Support PostgreSQL & SQLite)
+ */
+const extractRows = (result) => {
+  if (!result) return [];
+  if (Array.isArray(result)) return result; // Pola SQLite umum
+  if (result.rows && Array.isArray(result.rows)) return result.rows; // Pola PostgreSQL
+  return [];
+};
+
 /**
  * Parse pagination from request query params
  */
@@ -18,34 +46,31 @@ export const getMovies = async ({ page, limit, offset, search }) => {
   if (search) {
     const q = `%${search}%`;
     moviesRes = await query(`
-      SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+      SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
       FROM movies
       WHERE title ILIKE $1 OR genres ILIKE $1 OR actors ILIKE $1
       ORDER BY imdb_rating DESC NULLS LAST LIMIT $2 OFFSET $3
     `, [q, limit, offset]);
 
     totalRes = await query(`
-      SELECT COUNT(*) FROM movies
+      SELECT COUNT(*) as count FROM movies
       WHERE title ILIKE $1 OR genres ILIKE $1 OR actors ILIKE $1
     `, [q]);
   } else {
     moviesRes = await query(`
-      SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+      SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
       FROM movies
       ORDER BY imdb_rating DESC NULLS LAST LIMIT $1 OFFSET $2
     `, [limit, offset]);
 
-    totalRes = await query('SELECT COUNT(*) FROM movies');
+    totalRes = await query('SELECT COUNT(*) as count FROM movies');
   }
 
-  const total = parseInt(totalRes.rows[0].count);
+  const rows = extractRows(moviesRes);
+  const totalRows = extractRows(totalRes);
+  const total = parseInt(totalRows[0]?.count || 0, 10);
 
-  const BASE_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-
-  const moviesWithImages = moviesRes.rows.map(movie => ({
-    ...movie,
-    poster_url: movie.poster_path ? `${BASE_IMAGE_URL}${movie.poster_path}` : null
-  }));
+  const moviesWithImages = rows.map(addPosterUrl);
 
   return {
     movies: moviesWithImages,
@@ -54,26 +79,33 @@ export const getMovies = async ({ page, limit, offset, search }) => {
 };
 
 /**
- * Get a single movie by ID
  */
-export const getMovieById = async (movieId) => {
-  const movieRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year, poster_path
-    FROM movies WHERE movie_id = $1
-  `, [movieId]);
+export const getMovieById = async (id) => {
+  const cleanId = parseInt(id, 10);
+  if (isNaN(cleanId)) return null;
 
-  if (movieRes.rows.length === 0) {
+  // STRATEGI 1: Cari dulu di kolom 'id' (Primary Key database kamu)
+  let movieRes = await query(`
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year, poster_path
+    FROM movies WHERE id = $1
+  `, [cleanId]);
+
+  let rows = extractRows(movieRes);
+
+  // STRATEGI 2: Kalau di kolom 'id' ga ada, otomatis cari di kolom 'movie_id' (ID dari TMDB)
+  if (rows.length === 0) {
+    movieRes = await query(`
+      SELECT id, movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year, poster_path
+      FROM movies WHERE movie_id = $1
+    `, [cleanId]);
+    rows = extractRows(movieRes);
+  }
+
+  if (rows.length === 0) {
     return null;
   }
 
-  const movies = movieRes.rows[0];
-
-  const BASE_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-  
-  return {
-    ...movies,
-    poster_url: movies.poster_path ? `${BASE_IMAGE_URL}${movies.poster_path}` : null
-  };
+  return addPosterUrl(rows[0]);
 };
 
 /**
@@ -81,7 +113,7 @@ export const getMovieById = async (movieId) => {
  */
 export const findMovieByTitle = async (searchTitle) => {
   const movieRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
     FROM movies
     WHERE title ILIKE $1
     ORDER BY 
@@ -90,11 +122,12 @@ export const findMovieByTitle = async (searchTitle) => {
     LIMIT 1
   `, [`%${searchTitle}%`, searchTitle]);
 
-  if (movieRes.rows.length === 0) {
+  const rows = extractRows(movieRes);
+  if (rows.length === 0) {
     return null;
   }
 
-  return movieRes.rows[0];
+  return addPosterUrl(rows[0]);
 };
 
 /**
@@ -102,14 +135,14 @@ export const findMovieByTitle = async (searchTitle) => {
  */
 export const getTopByGenre = async (genre, limit = 10) => {
   const moviesRes = await query(`
-    SELECT movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
     FROM movies
     WHERE genres ILIKE $1
     ORDER BY imdb_rating DESC NULLS LAST
     LIMIT $2
   `, [`%${genre}%`, limit]);
 
-  return moviesRes.rows;
+  return extractRows(moviesRes).map(addPosterUrl);
 };
 
 /**
@@ -121,43 +154,67 @@ export const getByMultipleGenres = async (genreArray, limit = 10) => {
   params.push(parseInt(limit));
 
   const moviesRes = await query(`
-    SELECT DISTINCT movie_id, title, genres, actors, overview, imdb_rating, year
+    SELECT DISTINCT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
     FROM movies
     WHERE genres ILIKE ANY(ARRAY[${placeholders}])
     ORDER BY imdb_rating DESC NULLS LAST
     LIMIT $${params.length}
   `, params);
 
-  return moviesRes.rows;
+  return extractRows(moviesRes).map(addPosterUrl);
 };
 
 /**
- * Get user genre preferences and recommend movies based on them
+ * Get user recommendations dengan poster_url yang sudah berbentuk link
  */
 export const getUserRecommendations = async (userId, limit = 10) => {
   const prefsRes = await query('SELECT genre FROM user_preferences WHERE user_id = $1', [userId]);
+  const prefsRows = extractRows(prefsRes);
 
-  if (prefsRes.rows.length === 0) {
+  if (prefsRows.length === 0) {
     return { error: 'User belum memiliki preferensi genre.', status: 400 };
   }
 
-  const preferredGenres = prefsRes.rows.map(p => p.genre);
+  const preferredGenres = prefsRows.map(p => p.genre);
   const placeholders = preferredGenres.map((_, i) => `$${i + 1}`).join(', ');
   const params = preferredGenres.map(g => `%${g}%`);
   params.push(limit);
 
   const moviesRes = await query(`
-    SELECT DISTINCT m.movie_id, m.title, m.genres, m.actors, m.overview, m.imdb_rating, m.year, m.poster_path
+    SELECT DISTINCT m.id, m.movie_id, m.title, m.genres, m.actors, m.overview, m.imdb_rating, m.year, m.poster_path
     FROM movies m
     WHERE m.genres ILIKE ANY(ARRAY[${placeholders}])
     ORDER BY m.imdb_rating DESC NULLS LAST
     LIMIT $${params.length}
   `, params);
 
+  const recommendations = extractRows(moviesRes).map(addPosterUrl);
+
   return {
     user_id: userId,
     user_preferences: preferredGenres,
-    recommendations: moviesRes.rows,
-    total: moviesRes.rows.length
+    recommendations: recommendations,
+    total: recommendations.length
   };
+};
+
+/**
+ * Ambil rincian satu film berdasarkan TMDB MOVIE_ID
+ */
+export const getMovieByTmdbId = async (tmdbId) => {
+  const cleanId = parseInt(tmdbId, 10);
+  if (isNaN(cleanId)) return null;
+
+  const movieRes = await query(`
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year, poster_path
+    FROM movies WHERE movie_id = $1
+  `, [cleanId]);
+
+  const rows = extractRows(movieRes);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return addPosterUrl(rows[0]);
 };

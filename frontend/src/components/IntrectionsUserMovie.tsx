@@ -9,103 +9,95 @@ import {
 import { getLikes, toggleLike, shareMovie } from '@/app/lib/api';
 import { useAuth } from '@/app/contexts/AuthContext';
 
-
 interface InteractionsUserMovieProps {
     movieId: number;
     movieTitle: string;
 }
 
-export default function InteractionsUserMovie({ movieId, movieTitle } : InteractionsUserMovieProps) {
+export default function InteractionsUserMovie({ movieId, movieTitle }: InteractionsUserMovieProps) {
+    const { isAuthenticated } = useAuth();
 
-
-    const { user } = useAuth();
-    const userId = user?.id || 0;
-
-    
     const [totalLikes, setTotalLikes] = useState(0);
     const [isLiked, setIsLiked] = useState(false);
     const [isLiking, setIsLiking] = useState(false);
-    
+
     const [showShareMenu, setShowShareMenu] = useState(false);
     const [shareSuccess, setShareSuccess] = useState<string | null>(null);
     const shareRef = useRef<HTMLDivElement>(null);
-    
 
-    
     const handleToggleLike = async () => {
-    if (!userId) return;
-    setIsLiking(true);
-    try {
-      const result = await toggleLike(movieId, userId);
-      setIsLiked(result.liked);
-      setTotalLikes((prev) => (result.liked ? prev + 1 : prev - 1));
-    } catch {
-      // silent fail
-    } finally {
-      setIsLiking(false);
-    }
-  };
-
-  const handleShare = async (platform: string) => {
-    setShowShareMenu(false);
-    const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
-
-    if (platform === 'copy') {
+      if (!isAuthenticated) return;
+      setIsLiking(true);
       try {
-        await navigator.clipboard.writeText(pageUrl);
-        setShareSuccess('Link disalin!');
-        setTimeout(() => setShareSuccess(null), 2000);
+        const result = await toggleLike(movieId);
+        setIsLiked(result.liked);
+        setTotalLikes((prev) => (result.liked ? prev + 1 : prev - 1));
       } catch {
-        setShareSuccess('Gagal menyalin link');
-        setTimeout(() => setShareSuccess(null), 2000);
+        // silent fail
+      } finally {
+        setIsLiking(false);
       }
-    } else if (platform === 'whatsapp') {
-      window.open(
-        `https://wa.me/?text=${encodeURIComponent(`Cek film "${movieTitle}" di SmartMovie! ${pageUrl}`)}`,
-        '_blank'
-      );
-    } else if (platform === 'twitter') {
-      window.open(
-        `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Cek film "${movieTitle}" di SmartMovie!`)}&url=${encodeURIComponent(pageUrl)}`,
-        '_blank'
-      );
-    }
+    };
 
-    if (userId) {
-      shareMovie(movieId, userId, platform).catch(() => {});
-    }
-  };
+    const handleShare = async (platform: string) => {
+      setShowShareMenu(false);
+      const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+      if (platform === 'copy') {
+        try {
+          await navigator.clipboard.writeText(pageUrl);
+          setShareSuccess('Link disalin!');
+          setTimeout(() => setShareSuccess(null), 2000);
+        } catch {
+          setShareSuccess('Gagal menyalin link');
+          setTimeout(() => setShareSuccess(null), 2000);
+        }
+      } else if (platform === 'whatsapp') {
+        window.open(
+          `https://wa.me/?text=${encodeURIComponent(`Cek film "${movieTitle}" di SmartMovie! ${pageUrl}`)}`,
+          '_blank'
+        );
+      } else if (platform === 'twitter') {
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Cek film "${movieTitle}" di SmartMovie!`)}&url=${encodeURIComponent(pageUrl)}`,
+          '_blank'
+        );
+      }
+
+      if (isAuthenticated) {
+        shareMovie(movieId, platform).catch(() => {});
+      }
+    };
 
     useEffect(() => {
-  
       getLikes(movieId)
         .then((data) => setTotalLikes(data.total_likes))
         .catch(() => {});
     }, [movieId]);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
-        setShowShareMenu(false);
+    useEffect(() => {
+      function handleClickOutside(event: MouseEvent) {
+        if (shareRef.current && !shareRef.current.contains(event.target as Node)) {
+          setShowShareMenu(false);
+        }
       }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
-  return  (
-    <>
-          <motion.section
+    return (
+      <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="rounded-2xl  flex items-center gap-4 sm:gap-6 mb-8"
+        className="rounded-2xl flex items-center gap-4 sm:gap-6 mb-8"
       >
         {/* Like Button */}
         <button
           onClick={handleToggleLike}
-          disabled={isLiking || !userId}
+          disabled={isLiking || !isAuthenticated}
           className="flex items-center gap-2 group transition-all disabled:opacity-50"
+          title={!isAuthenticated ? 'Masuk untuk like' : ''}
         >
           <div
             className={`w-10 h-10 md:w-12 md:h-12 lg:w-13 lg:h-13 rounded-xl flex items-center justify-center transition-all ${
@@ -197,6 +189,5 @@ export default function InteractionsUserMovie({ movieId, movieTitle } : Interact
           </AnimatePresence>
         </div>
       </motion.section>
-    </>
-  )
+    );
 }

@@ -9,8 +9,8 @@ import { initDB } from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import movieRoutes from './routes/movie.routes.js';
 import healthRoutes from './routes/health.routes.js';
-import profileRoutes from './routes/profileRoutes.js';      // ✅ BARU
-import socialRoutes from './routes/socialRoutes.js';        // ✅ BARU
+import profileRoutes from './routes/profile.routes.js';
+import socialRoutes from './routes/social.routes.js';
 
 const app = express();
 

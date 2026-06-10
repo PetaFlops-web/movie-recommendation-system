@@ -19,7 +19,7 @@ import {
   ChevronRight,
   LogOut,
 } from "lucide-react";
-import { MovieFromAPI, MovieWithSimilarity } from "@/types/movieType";
+import { MovieFromAPI, MovieWithSimilarity, RecommendationsByCategory } from "@/types/movieType";
 import { decodeMovieTitle, formatIMDBScore, formatRuntime, parseGenres, encodeMovieTitle } from "@/helpers/jsosParser";
 import { fetchMovieDetail } from "@/app/lib/api";
 import { useAuth } from "@/app/contexts/AuthContext";
@@ -33,9 +33,10 @@ export default function MovieDetailPage() {
   const { user, logout } = useAuth();
 
   const [movie, setMovie] = useState<MovieFromAPI | null>(null);
-  const [recommendations, setRecommendations] = useState<MovieWithSimilarity[]>(
-    [],
-  );
+  const [recommendations, setRecommendations] = useState<RecommendationsByCategory>({
+    hybrid: [],
+    tfidf: [],
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,11 +68,12 @@ export default function MovieDetailPage() {
   const glowColor = "#00A9FF";
 
   // Scroll ref and handler for horizontal recommendations
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollByAmount = (direction: "left" | "right") => {
-    if (scrollRef.current) {
+  const hybridScrollRef = useRef<HTMLDivElement>(null);
+  const tfidfScrollRef = useRef<HTMLDivElement>(null);
+  const scrollByAmount = (ref: React.RefObject<HTMLDivElement | null>, direction: "left" | "right") => {
+    if (ref.current) {
       const amount = direction === "left" ? -360 : 360;
-      scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
+      ref.current.scrollBy({ left: amount, behavior: "smooth" });
     }
   };
 
@@ -307,13 +309,13 @@ export default function MovieDetailPage() {
         </section>
 
         {/* REKOMENDASI */}
-        <section className="mt-8">
-          <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
-            <div className="flex items-center gap-2">
+        {(recommendations.hybrid.length > 0 || recommendations.tfidf.length > 0) && (
+          <section className="mt-8">
+            <div className="flex items-center gap-2 mb-8 border-b border-white/5 pb-4">
               <Zap className="w-10 h-10 text-brand-300" />
               <div>
                 <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  Similar Recommendations
+                  Rekomendasi Film
                 </h2>
                 <p className="text-slate-400 text-sm mt-1">
                   Koleksi film yang mirip dengan{" "}
@@ -322,26 +324,173 @@ export default function MovieDetailPage() {
               </div>
             </div>
 
-            {/* Scroll Navigation Buttons */}
-            {recommendations.length > 0 && (
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => scrollByAmount("left")}
-                  className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 hover:border-brand-300/30 hover:bg-white/[0.08] flex items-center justify-center text-slate-400 hover:text-white transition-all group/btn"
-                >
-                  <ChevronLeft className="w-5 h-5 group-hover/btn:text-brand-300 transition-colors" />
-                </button>
-                <button
-                  onClick={() => scrollByAmount("right")}
-                  className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 hover:border-brand-300/30 hover:bg-white/[0.08] flex items-center justify-center text-slate-400 hover:text-white transition-all group/btn"
-                >
-                  <ChevronRight className="w-5 h-5 group-hover/btn:text-brand-300 transition-colors" />
-                </button>
-              </div>
-            )}
-          </div>
+            {(() => {
+              const renderRecCarousel = (
+                items: MovieWithSimilarity[],
+                scrollRef: React.RefObject<HTMLDivElement | null>,
+                label: string,
+                description: string,
+                accentColor: string,
+              ) => {
+                if (items.length === 0) return null;
+                return (
+                  <div className="mb-10">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                          <span
+                            className="inline-block w-2 h-2 rounded-full"
+                            style={{ backgroundColor: accentColor }}
+                          />
+                          {label}
+                        </h3>
+                        <p className="text-slate-500 text-xs mt-0.5">{description}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => scrollByAmount(scrollRef, "left")}
+                          className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/10 hover:border-brand-300/30 hover:bg-white/[0.08] flex items-center justify-center text-slate-400 hover:text-white transition-all group/btn"
+                        >
+                          <ChevronLeft className="w-4 h-4 group-hover/btn:text-brand-300 transition-colors" />
+                        </button>
+                        <button
+                          onClick={() => scrollByAmount(scrollRef, "right")}
+                          className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/10 hover:border-brand-300/30 hover:bg-white/[0.08] flex items-center justify-center text-slate-400 hover:text-white transition-all group/btn"
+                        >
+                          <ChevronRight className="w-4 h-4 group-hover/btn:text-brand-300 transition-colors" />
+                        </button>
+                      </div>
+                    </div>
+                    <div
+                      ref={scrollRef}
+                      className="flex gap-4 md:gap-6 overflow-x-auto pb-4"
+                      style={{ scrollbarWidth: "none" }}
+                    >
+                      {items.map((rec, idx) => {
+                        const recRuntime = rec.runtime
+                          ? formatRuntime(Number(rec.runtime) || null)
+                          : "";
+                        const recGenres = parseGenres(rec.genre);
+                        return (
+                          <motion.div
+                            key={`${rec.title}-${idx}`}
+                            initial={{ opacity: 0, x: 30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.4, delay: idx * 0.06 }}
+                            className="shrink-0 w-[280px] md:w-[320px]"
+                          >
+                            <Link href={`/movie/${encodeMovieTitle(rec.title)}`}>
+                              <div className="movie-card glass-panel relative w-full h-[430px] md:h-[480px] rounded-3xl cursor-pointer group overflow-hidden flex flex-col justify-end border border-white/5 shadow-lg">
+                                {rec.poster_url && (
+                                  <div className="absolute inset-0 w-full h-full z-0">
+                                    <Image
+                                      src={rec.poster_url}
+                                      alt={rec.title}
+                                      fill
+                                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                                      className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0A1628] via-[#0A1628]/60 to-transparent via-45% z-10 pointer-events-none" />
+                                  </div>
+                                )}
+                                {rec.imdb_score > 0 && (
+                                  <div className="absolute top-3 right-3 z-20 flex items-center gap-1 bg-[#0A1628]/60 backdrop-blur-md text-white px-2.5 py-1 rounded-lg font-black text-[11px] border border-white/10 shadow-[0_0_15px_rgba(0,169,255,0.15)]">
+                                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                                    <span>{formatIMDBScore(rec.imdb_score)}</span>
+                                  </div>
+                                )}
+                                <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-[#0A1628]/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-brand-300/20 shadow-md">
+                                  <Sparkles className="w-3 h-3 text-brand-300" />
+                                  <span className="text-[11px] font-black text-brand-200">
+                                    {(rec.similarity_score * 100).toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="relative z-20 p-5 w-full flex flex-col gap-2">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {recGenres.slice(0, 2).map((g) => (
+                                      <span
+                                        key={g}
+                                        className="genre-pill px-2.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider"
+                                      >
+                                        {g}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <h3 className="text-base md:text-lg font-black text-white group-hover:text-brand-300 transition-colors leading-tight line-clamp-2 text-glow">
+                                    {rec.title}
+                                  </h3>
+                                  <p className="text-[11px] text-slate-400/80 leading-relaxed line-clamp-2 font-light">
+                                    {rec.overview &&
+                                    rec.overview !== "nan" &&
+                                    rec.overview.trim() !== "" ? (
+                                      rec.overview
+                                    ) : (
+                                      <span className="italic text-slate-500/60">
+                                        Sinopsis belum tersedia untuk film ini.
+                                      </span>
+                                    )}
+                                  </p>
+                                  <div className="pt-3 mt-1 border-t border-brand-300/10 flex items-center justify-between text-[11px]">
+                                    <div className="text-[9px] text-slate-400 uppercase font-bold flex items-center gap-1">
+                                      {rec.year && <span>{rec.year}</span>}
+                                      {rec.year && recRuntime && (
+                                        <span className="w-1 h-1 rounded-full bg-slate-600" />
+                                      )}
+                                      {recRuntime && <span>{recRuntime}</span>}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-brand-300 group-hover:text-white flex items-center gap-1 transition-colors shrink-0">
+                                      Lihat Detail
+                                      <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="absolute inset-0 border border-white/0 group-hover:border-brand-300/30 rounded-3xl transition-all duration-300 pointer-events-none z-20" />
+                              </div>
+                            </Link>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              };
 
-          {recommendations.length === 0 ? (
+              return (
+                <>
+                  {renderRecCarousel(
+                    recommendations.hybrid,
+                    hybridScrollRef,
+                    "Hybrid Recommendations",
+                    "Kombinasi content-based & collaborative filtering",
+                    "#00A9FF",
+                  )}
+                  {renderRecCarousel(
+                    recommendations.tfidf,
+                    tfidfScrollRef,
+                    "TF-IDF Recommendations",
+                    "Berdasarkan kemiripan sinopsis menggunakan TF-IDF",
+                    "#A855F7",
+                  )}
+                </>
+              );
+            })()}
+          </section>
+        )}
+
+        {recommendations.hybrid.length === 0 && recommendations.tfidf.length === 0 && (
+          <section className="mt-8">
+            <div className="flex items-center gap-2 mb-6 border-b border-white/5 pb-4">
+              <Zap className="w-10 h-10 text-brand-300" />
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  Rekomendasi Film
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  Koleksi film yang mirip dengan{" "}
+                  <strong className="text-brand-200">{movie.title}</strong>
+                </p>
+              </div>
+            </div>
             <div className="glass-panel p-12 rounded-3xl text-center border border-white/5">
               <Film className="w-12 h-12 text-slate-600 mx-auto mb-4" />
               <h3 className="text-white font-bold text-lg mb-2">
@@ -351,123 +500,13 @@ export default function MovieDetailPage() {
                 Belum ada rekomendasi serupa untuk film ini.
               </p>
             </div>
-          ) : (
-            <div
-              ref={scrollRef}
-              className="flex gap-4 md:gap-6 overflow-x-auto pb-4"
-              style={{ scrollbarWidth: "none" }}
-            >
-              {recommendations.map((rec, idx) => {
-                const recRuntime = rec.runtime
-                  ? formatRuntime(Number(rec.runtime) || null)
-                  : "";
-                const recGenres = parseGenres(rec.genre);
-                return (
-                  <motion.div
-                    key={`${rec.title}-${idx}`}
-                    initial={{ opacity: 0, x: 30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.4, delay: idx * 0.06 }}
-                    className="shrink-0 w-[280px] md:w-[320px]"
-                  >
-                    <Link href={`/movie/${encodeMovieTitle(rec.title)}`}>
-                      <div className="movie-card glass-panel relative w-full h-[430px] md:h-[480px] rounded-3xl cursor-pointer group overflow-hidden flex flex-col justify-end border border-white/5 shadow-lg">
+          </section>
+        )}
 
-                        {/* Poster Image Background */}
-                        {rec.poster_url && (
-                          <div className="absolute inset-0 w-full h-full z-0">
-                            <Image
-                              src={rec.poster_url}
-                              alt={rec.title}
-                              fill
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                              className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#0A1628] via-[#0A1628]/60 to-transparent via-45% z-10 pointer-events-none" />
-                          </div>
-                        )}
-
-                        {/* Rating Badge */}
-                        {rec.imdb_score > 0 && (
-                          <div className="absolute top-3 right-3 z-20 flex items-center gap-1 bg-[#0A1628]/60 backdrop-blur-md text-white px-2.5 py-1 rounded-lg font-black text-[11px] border border-white/10 shadow-[0_0_15px_rgba(0,169,255,0.15)]">
-                            <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                            <span>{formatIMDBScore(rec.imdb_score)}</span>
-                          </div>
-                        )}
-
-                        {/* Similarity Badge */}
-                        <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-[#0A1628]/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-brand-300/20 shadow-md">
-                          <Sparkles className="w-3 h-3 text-brand-300" />
-                          <span className="text-[11px] font-black text-brand-200">
-                            {(rec.similarity_score * 100).toFixed(1)}%
-                          </span>
-                        </div>
-
-                        {/* Bottom Content */}
-                        <div className="relative z-20 p-5 w-full flex flex-col gap-2">
-
-
-                          {/* Genre Pills */}
-                          <div className="flex flex-wrap gap-1.5">
-                            {recGenres.slice(0, 2).map((g) => (
-                              <span
-                                key={g}
-                                className="genre-pill px-2.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider"
-                              >
-                                {g}
-                              </span>
-                            ))}
-                          </div>
-
-                          {/* Title */}
-                          <h3 className="text-base md:text-lg font-black text-white group-hover:text-brand-300 transition-colors leading-tight line-clamp-2 text-glow">
-                            {rec.title}
-                          </h3>
-
-                          {/* Synopsis */}
-                          <p className="text-[11px] text-slate-400/80 leading-relaxed line-clamp-2 font-light">
-                            {rec.overview &&
-                            rec.overview !== "nan" &&
-                            rec.overview.trim() !== "" ? (
-                              rec.overview
-                            ) : (
-                              <span className="italic text-slate-500/60">
-                                Sinopsis belum tersedia untuk film ini.
-                              </span>
-                            )}
-                          </p>
-
-                          {/* Footer */}
-                          <div className="pt-3 mt-1 border-t border-brand-300/10 flex items-center justify-between text-[11px]">
-                            <div className="text-[9px] text-slate-400 uppercase font-bold flex items-center gap-1">
-                              {rec.year && <span>{rec.year}</span>}
-                              {rec.year && recRuntime && (
-                                <span className="w-1 h-1 rounded-full bg-slate-600" />
-                              )}
-                              {recRuntime && <span>{recRuntime}</span>}
-                            </div>
-                            <span className="text-[10px] font-bold text-brand-300 group-hover:text-white flex items-center gap-1 transition-colors shrink-0">
-                              Lihat Detail
-                              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Hover Border Effect */}
-                        <div className="absolute inset-0 border border-white/0 group-hover:border-brand-300/30 rounded-3xl transition-all duration-300 pointer-events-none z-20" />
-                      </div>
-                    </Link>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-
-        {/* SOCIAL INTERACTION — Like, Share, Comments */}
+        {/* SOCIAL INTERACTION — Comments */}
         {movie.movie_id && (
           <CommentSection movieId={movie.movie_id} />
         )}
-        </section>
       </main>
     </div>
   );
