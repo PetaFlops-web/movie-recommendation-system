@@ -4,6 +4,8 @@ import { fileURLToPath } from "url";
 import csv from "csv-parser";
 import { query, initDB, pool } from "../config/database.js";
 
+
+// Polyfill __dirname untuk ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -37,10 +39,12 @@ function parseDate(dateStr) {
     console.warn(`Error parsing date "${dateStr}":`, err.message);
     return null;
   }
+
 }
 
 async function importMovies() {
   try {
+
     await initDB();
     if (!fs.existsSync(CSV_PATH)) {
       console.error(`CSV file not found at ${CSV_PATH}`);
@@ -168,6 +172,7 @@ async function importMovies() {
     }
   } catch (err) {
     console.error("💥 Fatal:", err);
+
     process.exit(1);
   }
 }

@@ -21,6 +21,29 @@ const pool = new Pool(
       },
 );
 
+// === DETECT ENVIRONMENT ===
+if (process.env.DATABASE_URL) {
+  // ✅ PRODUCTION (Neon.tech / Railway / Koyeb)
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // Wajib untuk Neon.tech
+    }
+  });
+  console.log('🔗 Using DATABASE_URL (Production mode)');
+} else {
+  // ✅ LOCAL DEVELOPMENT
+  pool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: parseInt(process.env.DB_PORT) || 5432,
+  });
+  console.log(' Using local DB config (Development mode)');
+}
+
+// === INIT DATABASE ===
 export const initDB = async () => {
   try {
     await pool.query(`

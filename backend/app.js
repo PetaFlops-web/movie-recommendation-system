@@ -9,6 +9,8 @@ import { initDB } from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import movieRoutes from './routes/movie.routes.js';
 import healthRoutes from './routes/health.routes.js';
+import profileRoutes from './routes/profileRoutes.js';      // ✅ BARU
+import socialRoutes from './routes/socialRoutes.js';        // ✅ BARU
 
 const app = express();
 
@@ -19,6 +21,7 @@ const allowedOrigins = process.env.FRONTEND_URL
   : [];
 
 app.use(cors({
+
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (process.env.NODE_ENV !== 'production') return callback(null, true);
@@ -29,6 +32,7 @@ app.use(cors({
     console.warn(`CORS blocked origin: ${origin}`);
     callback(null, true); // Still allow but log warning — set to callback(new Error('CORS')) to block
   },
+
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -51,6 +55,14 @@ app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/health', healthRoutes);
 
+
+// ✅ TAMBAHKAN ROUTES BARU INI:
+app.use('/api/users', profileRoutes);   // Profile: GET/PUT /api/users/:userId/profile
+app.use('/api', socialRoutes);          // Social: POST/GET /api/movies/:id/comments, /like, /share
+
+// === 🏠 ROOT ENDPOINT ===
+
+
 app.get('/', (req, res) => {
   res.json({
     message: '🎬 Smart Movie Recommendation System API',
@@ -65,6 +77,15 @@ app.get('/', (req, res) => {
       movies: {
         list: 'GET /api/movies?page=1&limit=20&search=action',
         detail: 'GET /api/movies/:id (returns movie detail + Top 10 recommendations)'
+      },
+      users: {
+        profile: 'GET /api/users/:userId/profile | PUT /api/users/:userId/profile'
+      },
+      social: {
+        comments: 'GET/POST /api/movies/:movieId/comments',
+        like: 'POST /api/movies/:movieId/like',
+        likes: 'GET /api/movies/:movieId/likes',
+        share: 'POST /api/movies/:movieId/share'
       },
       health: 'GET /api/health'
     }
