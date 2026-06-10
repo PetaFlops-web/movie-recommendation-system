@@ -1,51 +1,8 @@
-const API_BASE = '/api';
+import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse, HealthResponse } from '@/types/movieType';
 
-// ============================================================
-// Types
-// ============================================================
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = `${API_BASE_URL}/api`;
 
-export interface MovieFromAPI {
-  movie_id?: number;
-  title: string;
-  genre: string;
-  actors?: string;
-  overview?: string;
-  imdb_score: number;
-  imdb_rating?: string | number;
-  year: string;
-  runtime?: number;
-  language?: string;
-  premiere?: string;
-}
-
-export interface MovieWithSimilarity extends MovieFromAPI {
-  similarity_score: number;
-}
-
-export interface MoviesResponse {
-  success: boolean;
-  page: number;
-  limit: number;
-  total: number;
-  total_pages: number;
-  movies: MovieFromAPI[];
-}
-
-export interface MovieDetailResponse {
-  success: boolean;
-  movie: MovieFromAPI;
-  recommendations: MovieWithSimilarity[];
-}
-
-export interface HealthResponse {
-  success: boolean;
-  data?: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
-// ============================================================
-// Mapping helpers
-// ============================================================
 
 function parseRating(value: unknown): number {
   if (value === undefined || value === null || value === '' || value === 'nan') return 0;
@@ -85,8 +42,30 @@ function mapRecommendation(raw: Record<string, unknown>): MovieWithSimilarity {
 }
 
 // ============================================================
-// API functions
+// Fetch helper with error handling for non-JSON responses
 // ============================================================
+
+async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(url, options);
+  } catch {
+    throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+  }
+  return res;
+}
+
+async function safeJsonParse(res: Response): Promise<Record<string, unknown>> {
+  const contentType = res.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    if (!res.ok) {
+      throw new Error(`Server error (HTTP ${res.status}). Coba lagi nanti.`);
+    }
+    throw new Error('Response dari server tidak valid. Periksa konfigurasi API URL.');
+  }
+  return res.json();
+}
+
 
 export async function fetchMovies(
   page: number = 1,
@@ -101,15 +80,16 @@ export async function fetchMovies(
     params.set('search', search);
   }
 
-  const res = await fetch(`${API_BASE}/movies?${params.toString()}`);
+  const res = await safeFetch(`${API_BASE}/movies?${params.toString()}`);
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.message || `Gagal memuat film (HTTP ${res.status})`);
   }
 
-  const json = await res.json();
-  const rawMovies = json?.data?.movies || [];
-  const pagination = json?.data?.pagination || {};
+  const json = await safeJsonParse(res) as Record<string, unknown>;
+  const data = json?.data as Record<string, unknown> | undefined;
+  const rawMovies = (data?.movies as Record<string, unknown>[]) || [];
+  const pagination = (data?.pagination as Record<string, number>) || {};
 
   const totalPages =
     pagination.pages ??
@@ -125,11 +105,6 @@ export async function fetchMovies(
   };
 }
 
-/**
- * Fetch detail film + rekomendasi berdasarkan judul film.
- * Alur: search by title → ambil movie_id → fetch detail by movie_id
- * Jika film tidak ada di ML dataset, tetap kembalikan data film dari search
- */
 export async function fetchMovieDetail(
   title: string
 ): Promise<MovieDetailResponse> {
@@ -144,14 +119,14 @@ export async function fetchMovieDetail(
     throw new Error('Film tidak ditemukan');
   }
 
-  // 2) Coba fetch detail + rekomendasi dari backend menggunakan movie_id
   if (found.movie_id) {
     try {
-      const res = await fetch(`${API_BASE}/movies/${found.movie_id}`);
+      const res = await safeFetch(`${API_BASE}/movies/${found.movie_id}`);
       if (res.ok) {
-        const json = await res.json();
-        const movie = mapMovie(json?.data?.movie || found);
-        const recommendations = (json?.data?.recommendations || []).map(mapRecommendation);
+        const json = await safeJsonParse(res) as Record<string, unknown>;
+        const data = json?.data as Record<string, unknown> | undefined;
+        const movie = mapMovie((data?.movie as Record<string, unknown>) || found);
+        const recommendations = ((data?.recommendations as Record<string, unknown>[]) || []).map(mapRecommendation);
         return {
           success: true,
           movie,
@@ -172,16 +147,14 @@ export async function fetchMovieDetail(
 }
 
 export async function fetchHealthCheck(): Promise<HealthResponse> {
-  const res = await fetch(`${API_BASE}/health`);
+  const res = await safeFetch(`${API_BASE}/health`);
   if (!res.ok) {
     throw new Error(`Health check gagal (HTTP ${res.status})`);
   }
   return res.json();
 }
 
-// ============================================================
-// Helpers
-// ============================================================
+
 
 export function formatIMDBScore(score: number): string {
   return score ? score.toFixed(1) : 'N/A';

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,25 +15,19 @@ import {
   Users,
   Zap,
   AlertCircle,
-} from 'lucide-react';
-import {
-  decodeMovieTitle,
-  encodeMovieTitle,
-  fetchMovieDetail,
-  formatIMDBScore,
-  formatRuntime,
-  formatSimilarityScore,
-  parseGenres,
-  type MovieFromAPI,
-  type MovieWithSimilarity,
-} from '../../lib/api';
+} from "lucide-react";
+import { MovieFromAPI, MovieWithSimilarity } from "@/types/movieType";
+import { decodeMovieTitle, formatIMDBScore, formatRuntime, parseGenres, encodeMovieTitle } from "@/helpers/jsosParser";
+import { fetchMovieDetail } from "@/app/lib/api";
 
 export default function MovieDetailPage() {
   const params = useParams();
   const decodedTitle = decodeMovieTitle(params.id as string);
 
   const [movie, setMovie] = useState<MovieFromAPI | null>(null);
-  const [recommendations, setRecommendations] = useState<MovieWithSimilarity[]>([]);
+  const [recommendations, setRecommendations] = useState<MovieWithSimilarity[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +43,9 @@ export default function MovieDetailPage() {
         setMovie(detail.movie);
         setRecommendations(detail.recommendations);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Gagal memuat detail film');
+        setError(
+          err instanceof Error ? err.message : "Gagal memuat detail film",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -59,15 +55,17 @@ export default function MovieDetailPage() {
   }, [decodedTitle]);
 
   const backdropGradient =
-    'radial-gradient(circle at center, rgba(0, 169, 255, 0.25) 0%, rgba(10, 22, 40, 0.98) 70%)';
-  const glowColor = '#00A9FF';
+    "radial-gradient(circle at center, rgba(0, 169, 255, 0.25) 0%, rgba(10, 22, 40, 0.98) 70%)";
+  const glowColor = "#00A9FF";
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center cinematic-bg">
         <div className="flex flex-col items-center gap-4">
           <div className="loading-spinner w-12 h-12" />
-          <p className="text-brand-200 font-medium animate-pulse">Memuat data film...</p>
+          <p className="text-brand-200 font-medium animate-pulse">
+            Memuat data film...
+          </p>
         </div>
       </div>
     );
@@ -78,7 +76,9 @@ export default function MovieDetailPage() {
       <div className="min-h-screen flex items-center justify-center cinematic-bg">
         <div className="glass-panel p-8 rounded-3xl max-w-md w-full text-center border-red-500/20">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Film Tidak Ditemukan</h2>
+          <h2 className="text-xl font-bold text-white mb-2">
+            Film Tidak Ditemukan
+          </h2>
           <p className="text-slate-400 text-sm mb-6">{error}</p>
           <Link href="/">
             <button className="px-6 py-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white font-semibold transition-colors w-full border border-white/10">
@@ -92,10 +92,15 @@ export default function MovieDetailPage() {
 
   const genres = parseGenres(movie.genre);
   const actors =
-    movie.actors && movie.actors !== 'nan'
-      ? movie.actors.split(',').map((a) => a.trim()).filter(Boolean)
+    movie.actors && movie.actors !== "nan"
+      ? movie.actors
+          .split(",")
+          .map((a) => a.trim())
+          .filter(Boolean)
       : [];
-  const runtimeDisplay = movie.runtime ? formatRuntime(Number(movie.runtime) || null) : '';
+  const runtimeDisplay = movie.runtime
+    ? formatRuntime(Number(movie.runtime) || null)
+    : "";
 
   return (
     <div className="relative min-h-screen z-10 selection:bg-brand-300/30 selection:text-brand-50 pb-20">
@@ -128,7 +133,7 @@ export default function MovieDetailPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <main className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {/* DETAIL */}
         <section className="glass-panel rounded-3xl p-6 sm:p-8 lg:p-10 border border-brand-300/10 shadow-2xl relative overflow-hidden mb-12">
           <div className="absolute inset-0 bg-slate-950/60 z-0 backdrop-blur-[2px]" />
@@ -137,20 +142,21 @@ export default function MovieDetailPage() {
             {/* Poster */}
             <div className="lg:col-span-4 flex justify-center">
               <div
-                className="w-full max-w-[280px] aspect-[2/3] rounded-2xl relative overflow-hidden shadow-2xl border border-white/15 flex flex-col justify-between p-6 transition-all duration-500 hover:scale-[1.02]"
+                className="w-full max-w-[420px] aspect-[2/3] rounded-2xl relative overflow-hidden shadow-2xl border border-white/15 flex flex-col justify-between p-6 transition-all duration-500 hover:scale-[1.02]"
                 style={{
                   background: backdropGradient,
                   boxShadow: `0 20px 40px -10px ${glowColor}25, 0 0 30px ${glowColor}10`,
                 }}
               >
                 <div className="absolute inset-0 bg-slate-950/50 z-0" />
+                
                 <div className="relative z-10 flex justify-between items-start">
-                  <span className="px-2 py-0.5 rounded bg-white/10 text-[9px] font-bold text-white border border-white/5">
+                  <span className="px-2 py-0.5 rounded bg-white/10 text-sm font-bold text-white border border-white/5">
                     SmartMovie
                   </span>
                   {movie.imdb_score > 0 && (
-                    <div className="flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded border border-white/10 text-amber-400 text-[10px] font-bold">
-                      <Star className="w-3 h-3 fill-amber-400" />
+                    <div className="flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded border border-white/10 text-amber-400 text-sm font-bold">
+                      <Star className="w-5 h-5 fill-amber-400" />
                       {formatIMDBScore(movie.imdb_score)}
                     </div>
                   )}
@@ -182,7 +188,7 @@ export default function MovieDetailPage() {
                     {runtimeDisplay}
                   </span>
                 )}
-                {movie.language && movie.language !== 'nan' && (
+                {movie.language && movie.language !== "nan" && (
                   <span className="flex items-center gap-1">
                     <Globe className="w-4 h-4 text-brand-300" />
                     {movie.language}
@@ -191,7 +197,9 @@ export default function MovieDetailPage() {
                 {movie.imdb_score > 0 && (
                   <span className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
                     <Star className="w-4 h-4 fill-amber-400" />
-                    <span className="font-bold">{formatIMDBScore(movie.imdb_score)}</span>
+                    <span className="font-bold">
+                      {formatIMDBScore(movie.imdb_score)}
+                    </span>
                     <span className="text-[10px] text-amber-400/60">/ 10</span>
                   </span>
                 )}
@@ -201,7 +209,10 @@ export default function MovieDetailPage() {
               {genres.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-5">
                   {genres.map((genre) => (
-                    <span key={genre} className="genre-pill px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                    <span
+                      key={genre}
+                      className="genre-pill px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm"
+                    >
                       {genre}
                     </span>
                   ))}
@@ -213,7 +224,9 @@ export default function MovieDetailPage() {
                 <div className="mb-5">
                   <div className="flex items-center gap-2 mb-2">
                     <Users className="w-4 h-4 text-brand-300" />
-                    <h3 className="text-sm font-bold text-brand-200 uppercase tracking-wider">Pemeran</h3>
+                    <h3 className="text-sm font-bold text-brand-200 uppercase tracking-wider">
+                      Pemeran
+                    </h3>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {actors.map((actor) => (
@@ -229,17 +242,21 @@ export default function MovieDetailPage() {
               )}
 
               {/* Overview */}
-              {movie.overview && movie.overview !== 'nan' && (
+              {movie.overview && movie.overview !== "nan" && (
                 <div className="mb-6">
-                  <h3 className="text-sm font-bold text-brand-200 uppercase tracking-wider mb-2">Sinopsis</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed font-light">{movie.overview}</p>
+                  <h3 className="text-sm font-bold text-brand-200 uppercase tracking-wider mb-2">
+                    Sinopsis
+                  </h3>
+                  <p className="text-sm text-slate-300 leading-relaxed font-light">
+                    {movie.overview}
+                  </p>
                 </div>
               )}
 
               {/* Status */}
               <div className="mt-auto pt-4">
                 {recommendations.length > 0 ? (
-                  <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-semibold">
+                  <div className="flex items-center gap-2 px-6 py-3 max-w-md rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm font-semibold">
                     <Sparkles className="w-4 h-4" />
                     {recommendations.length} rekomendasi film serupa untukmu
                   </div>
@@ -259,9 +276,12 @@ export default function MovieDetailPage() {
           <div className="flex items-center gap-2 mb-6 border-b border-white/5 pb-4">
             <Zap className="w-6 h-6 text-brand-300" />
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Rekomendasi Serupa</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Rekomendasi Serupa
+              </h2>
               <p className="text-slate-400 text-sm mt-1">
-                Koleksi film yang mirip dengan <strong className="text-brand-200">{movie.title}</strong>
+                Koleksi film yang mirip dengan{" "}
+                <strong className="text-brand-200">{movie.title}</strong>
               </p>
             </div>
           </div>
@@ -269,7 +289,9 @@ export default function MovieDetailPage() {
           {recommendations.length === 0 ? (
             <div className="glass-panel p-12 rounded-3xl text-center border border-white/5">
               <Film className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-white font-bold text-lg mb-2">Tidak Ada Rekomendasi</h3>
+              <h3 className="text-white font-bold text-lg mb-2">
+                Tidak Ada Rekomendasi
+              </h3>
               <p className="text-slate-400 text-sm">
                 Belum ada rekomendasi serupa untuk film ini.
               </p>
@@ -277,7 +299,9 @@ export default function MovieDetailPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {recommendations.map((rec, idx) => {
-                const recRuntime = rec.runtime ? formatRuntime(Number(rec.runtime) || null) : '';
+                const recRuntime = rec.runtime
+                  ? formatRuntime(Number(rec.runtime) || null)
+                  : "";
                 return (
                   <motion.div
                     key={`${rec.title}-${idx}`}
@@ -301,18 +325,25 @@ export default function MovieDetailPage() {
                             {rec.title}
                           </h3>
                           <span className="text-[10px] text-slate-400 font-semibold uppercase block mb-2 line-clamp-1">
-                            {parseGenres(rec.genre).join(' • ')}
+                            {parseGenres(rec.genre).join(" • ")}
                           </span>
                           <p className="text-[11px] text-slate-400/80 leading-relaxed line-clamp-3 mb-3 font-light">
-                            {rec.overview && rec.overview !== 'nan' && rec.overview.trim() !== ''
-                              ? rec.overview
-                              : <span className="italic text-slate-500/60">Sinopsis belum tersedia untuk film ini.</span>
-                            }
+                            {rec.overview &&
+                            rec.overview !== "nan" &&
+                            rec.overview.trim() !== "" ? (
+                              rec.overview
+                            ) : (
+                              <span className="italic text-slate-500/60">
+                                Sinopsis belum tersedia untuk film ini.
+                              </span>
+                            )}
                           </p>
                           <div className="w-full bg-white/5 rounded-full h-1.5 mt-2 overflow-hidden">
                             <div
                               className="bg-gradient-to-r from-brand-400 to-brand-200 h-1.5 rounded-full score-bar-fill"
-                              style={{ width: `${Math.min(rec.similarity_score * 100, 100)}%` }}
+                              style={{
+                                width: `${Math.min(rec.similarity_score * 100, 100)}%`,
+                              }}
                             />
                           </div>
                         </div>
@@ -320,7 +351,9 @@ export default function MovieDetailPage() {
                         <div className="relative z-10 pt-3 border-t border-white/5 flex items-center justify-between mt-auto">
                           <div className="text-[9px] text-slate-400 uppercase font-bold flex items-center gap-1">
                             {rec.year && <span>{rec.year}</span>}
-                            {rec.year && recRuntime && <span className="w-1 h-1 rounded-full bg-slate-600" />}
+                            {rec.year && recRuntime && (
+                              <span className="w-1 h-1 rounded-full bg-slate-600" />
+                            )}
                             {recRuntime && <span>{recRuntime}</span>}
                           </div>
                           <span className="text-[10px] font-bold text-brand-300 group-hover:text-white flex items-center gap-1 transition-colors">

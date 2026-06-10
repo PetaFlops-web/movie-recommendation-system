@@ -16,6 +16,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+print("🔍 Starting Flask application initialization...", flush=True)
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
@@ -23,27 +25,42 @@ CORS(app)  # Enable CORS for all routes
 df_processed = None
 tfidf_vectorizer = None
 cosine_sim_matrix = None
+models_loaded = False
 
 def load_and_process_data():
-    global df_processed, tfidf_vectorizer, cosine_sim_matrix
+    global df_processed, tfidf_vectorizer, cosine_sim_matrix, models_loaded
+    
+    logger.info("=" * 60)
+    logger.info("🔄 Loading ML models and data...")
+    logger.info("=" * 60)
     
     try:
-        # Path ke folder model (c:\Akbar\model)
+        # Path ke folder model
         model_dir = os.path.join(os.path.dirname(__file__), 'model')
         model_dir = os.path.normpath(model_dir)
         
-        logger.info(f"Model directory: {model_dir}")
+        logger.info(f"📁 Model directory: {model_dir}")
+        logger.info(f"✓ Directory exists: {os.path.exists(model_dir)}")
+        
+        if not os.path.exists(model_dir):
+            logger.error(f"❌ Model directory not found: {model_dir}")
+            return False
         
         # --- 1. Load df_processed.csv ---
         csv_path = os.path.join(model_dir, 'df_processed.csv')
+        logger.info(f"📄 Checking CSV: {csv_path}")
+        logger.info(f"✓ CSV exists: {os.path.exists(csv_path)}")
+        
         if not os.path.exists(csv_path):
-            logger.error(f"df_processed.csv not found: {csv_path}")
+            logger.error(f"❌ df_processed.csv not found: {csv_path}")
             return False
         
-        logger.info(f"Loading processed dataset from: {csv_path}")
+        logger.info(f"📥 Loading processed dataset...")
         df_processed = pd.read_csv(csv_path, encoding='utf-8')
+        logger.info(f"✅ Dataset loaded: {len(df_processed)} rows")
+        logger.info(f"📋 Columns: {list(df_processed.columns)}")
         
-        # Standarisasi nama kolom dari df_processed.csv
+        # Standarisasi nama kolom
         column_mapping = {
             'Title': 'title',
             'Genre': 'genres',
@@ -69,55 +86,81 @@ def load_and_process_data():
         if 'movie_id' not in df_processed.columns:
             df_processed['movie_id'] = range(1, len(df_processed) + 1)
         
-        logger.info(f"Dataset loaded: {len(df_processed)} movies")
-        logger.info(f"Columns: {list(df_processed.columns)}")
-        
         # --- 2. Load tfidf_vectorizer.pkl ---
         tfidf_path = os.path.join(model_dir, 'tfidf_vectorizer.pkl')
+        logger.info(f"🔧 Checking TF-IDF vectorizer: {tfidf_path}")
+        logger.info(f"✓ TF-IDF exists: {os.path.exists(tfidf_path)}")
+        
         if not os.path.exists(tfidf_path):
-            logger.error(f"tfidf_vectorizer.pkl not found: {tfidf_path}")
+            logger.error(f"❌ tfidf_vectorizer.pkl not found: {tfidf_path}")
             return False
         
-        logger.info(f"Loading TF-IDF vectorizer from: {tfidf_path}")
+        logger.info(f"📥 Loading TF-IDF vectorizer...")
         tfidf_vectorizer = joblib.load(tfidf_path)
-        logger.info(f"TF-IDF vectorizer loaded successfully")
+        logger.info(f"✅ TF-IDF vectorizer loaded")
         
         # --- 3. Load cosine_sim_matrix.pkl ---
         cosine_path = os.path.join(model_dir, 'cosine_sim_matrix.pkl')
+        logger.info(f"🔧 Checking Cosine Similarity matrix: {cosine_path}")
+        logger.info(f"✓ Cosine matrix exists: {os.path.exists(cosine_path)}")
+        
         if not os.path.exists(cosine_path):
-            logger.error(f"cosine_sim_matrix.pkl not found: {cosine_path}")
+            logger.error(f"❌ cosine_sim_matrix.pkl not found: {cosine_path}")
             return False
         
-        logger.info(f"Loading Cosine Similarity matrix from: {cosine_path}")
+        logger.info(f"📥 Loading Cosine Similarity matrix...")
         cosine_sim_matrix = joblib.load(cosine_path)
-        logger.info(f"Cosine Similarity matrix loaded! Shape: {cosine_sim_matrix.shape}")
+        logger.info(f"✅ Cosine Similarity matrix loaded! Shape: {cosine_sim_matrix.shape}")
         
         # Tampilkan sample data
-        title_col = 'title' if 'title' in df_processed.columns else df_processed.columns[0]
-        genre_col = 'genres' if 'genres' in df_processed.columns else 'Genre'
-        sample_cols = ['movie_id', title_col, genre_col]
+        sample_cols = ['movie_id', 'title', 'genres']
         sample_cols = [c for c in sample_cols if c in df_processed.columns]
         sample = df_processed[sample_cols].head(3)
-        logger.info(f"📋 Sample data:\n{sample.to_string(index=False)}")
+        logger.info(f"📋 Sample movies:\n{sample.to_string(index=False)}")
         
+        logger.info("=" * 60)
+        logger.info("✅ All models loaded successfully!")
+        logger.info("=" * 60)
+        
+        models_loaded = True
         return True
         
     except Exception as e:
-        logger.error(f"Error loading model artifacts: {str(e)}")
+        logger.error("=" * 60)
+        logger.error(f"❌ Error loading models: {str(e)}")
+        logger.error("=" * 60)
         import traceback
         logger.error(traceback.format_exc())
+        models_loaded = False
         return False
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'service': 'Movie Recommendation ML Service',
-        'movies_loaded': len(df_processed) if df_processed is not None else 0,
-        'models_ready': cosine_sim_matrix is not None
-    })
+    """Health check endpoint - ALWAYS respond"""
+    try:
+        health_data = {
+            'status': 'ok',
+            'service': 'Movie Recommendation ML Service',
+            'timestamp': datetime.now().isoformat(),
+            'models_loaded': models_loaded,
+            'movies_count': len(df_processed) if df_processed is not None else 0,
+            'cosine_matrix_ready': cosine_sim_matrix is not None
+        }
+        
+        if models_loaded:
+            health_data['status'] = 'healthy'
+            return jsonify(health_data), 200
+        else:
+            health_data['status'] = 'initializing'
+            return jsonify(health_data), 503  # Service Unavailable but responding
+            
+    except Exception as e:
+        logger.error(f"Error in health check: {e}")
+        return jsonify({
+            'status': 'error',
+            'service': 'Movie Recommendation ML Service',
+            'error': str(e)
+        }), 500
 
 @app.route('/recommend/content-based', methods=['POST'])
 def recommend_content_based():
@@ -337,21 +380,47 @@ def before_first_request():
             logger.error("Failed to load models. Service may not work properly.")
 
 if __name__ == '__main__':
-    logger.info("=" * 60)
-    logger.info("🎬 SMART MOVIE RECOMMENDATION - ML SERVICE")
-    logger.info("👤 Team: PJK-GM059 | IBM SkillsBuild Capstone")
-    logger.info("=" * 60)
-    
-    # Load models before starting server
-    if load_and_process_data():
-        logger.info("Models loaded successfully!")
-    else:
-        logger.warning("⚠️  Models failed to load. Start server anyway.")
-    
-    # Run Flask server
-    app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=True,
-        threaded=True
-    )
+    try:
+        print("\n" + "=" * 60, flush=True)
+        print("🎬 SMART MOVIE RECOMMENDATION - ML SERVICE", flush=True)
+        print("👤 Team: PJK-GM059 | IBM SkillsBuild Capstone", flush=True)
+        print("=" * 60 + "\n", flush=True)
+        
+        logger.info("=" * 60)
+        logger.info("🎬 SMART MOVIE RECOMMENDATION - ML SERVICE")
+        logger.info("👤 Team: PJK-GM059 | IBM SkillsBuild Capstone")
+        logger.info("=" * 60)
+        
+        # Load models before starting server
+        logger.info("🔄 Attempting to load ML models...")
+        models_ok = load_and_process_data()
+        
+        if models_ok:
+            logger.info("✅ Models loaded successfully!")
+            print("✅ Models loaded successfully!", flush=True)
+        else:
+            logger.warning("⚠️  Models failed to load. Service will run without ML models.")
+            logger.warning("⚠️  /health endpoint will return status: initializing")
+            print("⚠️  Models failed to load. Service will run without ML models.", flush=True)
+        
+        # Run Flask server
+        port = int(os.environ.get('PORT', 5000))
+        logger.info(f"🚀 Starting Flask server on 0.0.0.0:{port}")
+        logger.info(f"📍 Health check available at: http://localhost:{port}/health")
+        
+        print(f"\n🚀 Starting Flask server on 0.0.0.0:{port}", flush=True)
+        print(f"📍 Health check available at: http://localhost:{port}/health\n", flush=True)
+        
+        app.run(
+            host='0.0.0.0',
+            port=port,
+            debug=False,
+            threaded=True
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Fatal error during startup: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        print(f"❌ Fatal error during startup: {str(e)}", flush=True)
+        sys.exit(1)

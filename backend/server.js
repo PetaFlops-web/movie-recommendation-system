@@ -1,81 +1,31 @@
-import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import 'dotenv/config';
 import app from './app.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const PORT = parseInt(process.env.PORT) || 3000;
 
-const PORT = process.env.PORT || 3000;
+// Start server - Railway requires listening on the PORT env var
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+});
 
-// Start Python ML Service
-function startPythonService() {
-  console.log('🐍 Starting Python ML Service...');
-  
-  const pythonProcess = spawn('python', ['python_service/inference_server.py'], {
-    cwd: __dirname,
-    stdio: 'inherit',
-    shell: process.platform === 'win32'
+server.on('error', (e) => {
+  console.error('❌ Server Listen Error:', e);
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('Process terminated');
+    process.exit(0);
   });
+});
 
-  pythonProcess.on('error', (error) => {
-    console.error('❌ Failed to start Python service:', error.message);
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down...');
+  server.close(() => {
+    console.log('Process terminated');
+    process.exit(0);
   });
-
-  pythonProcess.on('close', (code) => {
-    console.log(`Python service exited with code ${code}`);
-  });
-
-  return pythonProcess;
-}
-
-// Start server
-function startServer() {
-  const server = app.listen(PORT, () => {
-    console.log('');
-    console.log('╔════════════════════════════════════════════════════════╗');
-    console.log('║   🎬 SMART MOVIE RECOMMENDATION SYSTEM                ║');
-    console.log('║   Team: PJK-GM059                                     ║');
-    console.log('╚════════════════════════════════════════════════════════╝');
-    console.log('');
-    console.log(`✅ Server running on port ${PORT}`);
-    console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 API: http://localhost:${PORT}`);
-    console.log(`🏥 Health: http://localhost:${PORT}/api/health`);
-    console.log('');
-  });
-
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('📴 SIGTERM received, shutting down gracefully...');
-    server.close(() => {
-      console.log('✅ Process terminated');
-      process.exit(0);
-    });
-  });
-
-  process.on('SIGINT', () => {
-    console.log('📴 SIGINT received, shutting down...');
-    server.close(() => {
-      console.log('✅ Process terminated');
-      process.exit(0);
-    });
-  });
-
-  return server;
-}
-
-// Main execution
-if (process.env.START_PYTHON_SERVICE !== 'false') {
-  startPythonService();
-  
-  // Wait for Python service to initialize
-  setTimeout(() => {
-    console.log('🚀 Starting Node.js server...');
-    startServer();
-  }, 3000);
-} else {
-  console.log('⚠️  Python ML Service disabled (START_PYTHON_SERVICE=false)');
-  startServer();
-}
+});

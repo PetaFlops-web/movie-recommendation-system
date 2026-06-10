@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   Film,
   Mail,
@@ -15,21 +15,32 @@ import {
   AlertCircle,
   Sparkles,
   CheckCircle,
-} from 'lucide-react';
-import { register } from '../lib/auth';
+} from "lucide-react";
+import { register, saveAuth } from "../lib/auth";
 
 const GENRE_LIST = [
-  'Drama', 'Comedy', 'Documentary', 'Thriller', 'Romance',
-  'Action', 'Horror', 'Crime', 'Animation', 'Sci-Fi',
-  'Mystery', 'Family', 'Adventure', 'Fantasy',
+  "Drama",
+  "Comedy",
+  "Documentary",
+  "Thriller",
+  "Romance",
+  "Action",
+  "Horror",
+  "Crime",
+  "Animation",
+  "Sci-Fi",
+  "Mystery",
+  "Family",
+  "Adventure",
+  "Fantasy",
 ];
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +49,7 @@ export default function RegisterPage() {
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres((prev) =>
-      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
+      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre],
     );
   };
 
@@ -47,20 +58,24 @@ export default function RegisterPage() {
     setError(null);
 
     if (selectedGenres.length === 0) {
-      setError('Pilih minimal 1 genre favorit');
+      setError("Pilih minimal 1 genre favorit");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await register(username, email, password, selectedGenres);
+      const res = await register(username, email, password, selectedGenres);
+      // Save auth data (token + user info) from backend response
+      if (res.data) {
+        saveAuth(res.data);
+      }
       setSuccess(true);
       setTimeout(() => {
-        router.push('/login');
+        router.push("/login");
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registrasi gagal');
+      setError(err instanceof Error ? err.message : "Registrasi gagal");
     } finally {
       setIsSubmitting(false);
     }
@@ -81,7 +96,7 @@ export default function RegisterPage() {
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
         className="relative z-10 w-full max-w-md"
       >
         {/* Logo */}
@@ -99,7 +114,6 @@ export default function RegisterPage() {
 
         {/* Card */}
         <div className="glass-panel rounded-2xl p-8 border border-white/10 shadow-2xl">
-
           {/* Success State */}
           {success ? (
             <motion.div
@@ -110,8 +124,12 @@ export default function RegisterPage() {
               <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/25 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-green-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Registrasi Berhasil!</h2>
-              <p className="text-sm text-slate-400 mb-4">Akun kamu sudah dibuat. Mengalihkan ke halaman login...</p>
+              <h2 className="text-xl font-bold text-white mb-2">
+                Registrasi Berhasil!
+              </h2>
+              <p className="text-sm text-slate-400 mb-4">
+                Akun kamu sudah dibuat. Mengalihkan ke halaman login...
+              </p>
               <div className="flex justify-center">
                 <div className="loading-spinner border-brand-300/30 border-t-brand-300 w-6 h-6" />
               </div>
@@ -134,6 +152,9 @@ export default function RegisterPage() {
                     className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-white text-sm placeholder:text-slate-600 focus:border-brand-300/50 focus:shadow-[0_0_0_3px_rgba(0,169,255,0.1)] outline-none transition-all"
                   />
                 </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  3-50 karakter (huruf, angka, underscore saja)
+                </p>
               </div>
 
               {/* Email */}
@@ -162,7 +183,7 @@ export default function RegisterPage() {
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Minimal 6 karakter"
@@ -175,9 +196,16 @@ export default function RegisterPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Minimal 6 karakter dengan minimal 1 angka (0-9)
+                </p>
               </div>
 
               {/* Genre Selection */}
@@ -194,8 +222,8 @@ export default function RegisterPage() {
                       onClick={() => toggleGenre(genre)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                         selectedGenres.includes(genre)
-                          ? 'bg-brand-300 text-white border-brand-300 shadow-lg shadow-brand-300/20'
-                          : 'bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                          ? "bg-brand-300 text-white border-brand-300 shadow-lg shadow-brand-300/20"
+                          : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:border-white/20"
                       }`}
                     >
                       {genre}
@@ -245,8 +273,11 @@ export default function RegisterPage() {
           {/* Link ke login */}
           {!success && (
             <p className="text-center text-xs text-slate-500 mt-6">
-              Sudah punya akun?{' '}
-              <Link href="/login" className="text-brand-300 font-bold hover:underline">
+              Sudah punya akun?{" "}
+              <Link
+                href="/login"
+                className="text-brand-300 font-bold hover:underline"
+              >
                 Masuk di sini
               </Link>
             </p>

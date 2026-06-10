@@ -1,136 +1,178 @@
-import fs from 'fs';
-import path from 'path';
-import pg from 'pg';
-import { fileURLToPath } from 'url';
-import 'dotenv/config';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import csv from "csv-parser";
+import { query, initDB, pool } from "../config/database.js";
+
 
 // Polyfill __dirname untuk ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { Pool } = pg;
+const CSV_PATH =
+  process.env.CSV_PATH || path.join(__dirname, "..", "dataset", "movies.csv");
 
-let pool;
-if (process.env.DATABASE_URL) {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL
-  });
-  console.log('🔗 Using DATABASE_URL (Production mode)');
-} else {
-  console.error('❌ DATABASE_URL tidak ditemukan!');
-  process.exit(1);
-}
+// Function to parse date from CSV format "October 16. 2019" to YYYY-MM-DD
+function parseDate(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return null;
 
-// Fungsi parse CSV yang benar (handle quotes & koma)
-function parseCSVLine(line) {
-  const result = [];
-  let current = '';
-  let inQuotes = false;
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
+  try {
+    // Remove extra spaces and period before year
+    const cleaned = dateStr.trim().replace(/\.\s+/, " ");
+
+    // Parse the date using Date object
+    const date = new Date(cleaned);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn(`Could not parse date: "${dateStr}", using NULL`);
+      return null;
     }
+
+    // Convert to YYYY-MM-DD format
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  } catch (err) {
+    console.warn(`Error parsing date "${dateStr}":`, err.message);
+    return null;
   }
-  
-  result.push(current.trim());
-  return result;
+
 }
 
 async function importMovies() {
   try {
-    console.log('🎬 Mulai import movies dari CSV...');
-    
-    const csvPath = path.join(__dirname, '../python_service/model/df_processed.csv');
-    
-    if (!fs.existsSync(csvPath)) {
-      console.error('❌ File CSV tidak ditemukan di:', csvPath);
+
+    await initDB();
+    if (!fs.existsSync(CSV_PATH)) {
+      console.error(`CSV file not found at ${CSV_PATH}`);
       process.exit(1);
     }
 
-    const fileContent = fs.readFileSync(csvPath, 'utf-8');
-    const lines = fileContent.split('\n').filter(line => line.trim());
-    const dataLines = lines.slice(1); // Skip header
-    
-    console.log(`📄 Menemukan ${dataLines.length} baris data`);
-    
-    let successCount = 0;
-    let errorCount = 0;
+    console.log(`Reading CSV from: ${CSV_PATH}`);
+    const movies = [];
+    let rowNum = 0;
 
-    for (let i = 0; i < dataLines.length; i++) {
-      const line = dataLines[i].trim();
-      if (!line) continue;
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(CSV_PATH)
+        .pipe(csv())
+        .on("data", (row) => {
+          rowNum++;
 
-      const parts = parseCSVLine(line);
-      if (parts.length < 9) continue;
+          // Generate unique movie_id dari kombinasi Title + Row Number
+          const titleSlug = (row.Title || "")
+            .replace(/[^a-zA-Z0-9]/g, "")
+            .substring(0, 10);
+          const movie_id =
+            parseInt(
+              `${rowNum}${titleSlug.length}${row.Year || "2020"}`.substring(
+                0,
+                10,
+              ),
+            ) || rowNum * 1000;
 
-      // Mapping CSV:
-      // [0]Title, [1]Genre, [2]Premiere, [3]Runtime, [4]IMDB Score,
-      // [5]Language, [6]Year, [7]Real_Actor, [8]Overview
-      const title = parts[0]?.replace(/^"|"$/g, '') || '';
-      const genres = parts[1]?.replace(/^"|"$/g, '') || '';
-      const premiere = parts[2]?.replace(/^"|"$/g, '') || null;
-      const runtimeStr = parts[3]?.replace(/^"|"$/g, '') || '';
-      const imdbRatingStr = parts[4]?.replace(/^"|"$/g, '') || '';
-      const language = parts[5]?.replace(/^"|"$/g, '') || null;
-      const yearStr = parts[6]?.replace(/^"|"$/g, '') || '';
-      const actors = parts[7]?.replace(/^"|"$/g, '') || '';
-      const overview = parts[8]?.replace(/^"|"$/g, '') || '';
-      
-      const imdb_rating = imdbRatingStr ? parseFloat(imdbRatingStr) : null;
-      const runtime = runtimeStr ? parseInt(runtimeStr) : null;
-      const year = yearStr ? parseInt(yearStr) : null;
-      const movie_id = i + 1;
+          const movie = {
+            movie_id: movie_id,
+            title: row.Title || `Untitled Movie ${rowNum}`,
+            genres: row.Genre || "Unknown",
+            actors: row.Real_Actor || "",
+            overview: row.Overview || "",
+            imdb_rating: parseFloat(row["IMDB Score"]) || null,
+            premiere: parseDate(row.Premiere),
+            runtime: parseInt(row.Runtime) || null,
+            language: row.Language || "",
+            year: parseInt(row.Year) || null,
+          };
 
-      if (title) {
-        try {
-          await pool.query(
-            `INSERT INTO movies (movie_id, title, genres, actors, overview, imdb_rating, year, premiere, runtime, language) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-             ON CONFLICT (movie_id) DO NOTHING`,
-            [movie_id, title, genres, actors, overview, imdb_rating, year, premiere, runtime, language]
-          );
-          successCount++;
-          
-          if (successCount % 100 === 0) {
-            console.log(`   Progress: ${successCount} movies...`);
+          if (movie.title && movie.title !== "Untitled Movie") {
+            movies.push(movie);
           }
-        } catch (err) {
-          errorCount++;
-          if (errorCount <= 3) {
-            console.log(`   Error di baris ${i}: ${err.message.substring(0, 100)}`);
-          }
-        }
-      }
-    }
-
-    console.log(`\n✅ Berhasil import ${successCount} movies!`);
-    if (errorCount > 0) {
-      console.log(`️ Ada ${errorCount} error`);
-    }
-    
-    // Cek total
-    const result = await pool.query('SELECT COUNT(*) FROM movies');
-    console.log(`📊 Total movies di database: ${result.rows[0].count}`);
-    
-    // Sample data
-    const sample = await pool.query('SELECT movie_id, title, genres, imdb_rating, year FROM movies LIMIT 5');
-    console.log('\n️ Sample movies:');
-    sample.rows.forEach(movie => {
-      console.log(`   - [${movie.movie_id}] ${movie.title} (${movie.year}) | ${movie.genres} | Rating: ${movie.imdb_rating}`);
+        })
+        .on("end", resolve)
+        .on("error", reject);
     });
-    
-    await pool.end();
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error:', error.message);
+
+    console.log(
+      `✅ Parsed ${movies.length} movies. Inserting to PostgreSQL...`,
+    );
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Buat tabel movies dengan struktur yang sesuai CSV
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS movies (
+          id SERIAL PRIMARY KEY,
+          movie_id INTEGER UNIQUE NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          genres TEXT,
+          actors TEXT,
+          overview TEXT,
+          imdb_rating DECIMAL(3,1),
+          premiere DATE,
+          runtime INTEGER,
+          language VARCHAR(100),
+          year INTEGER,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      const insertSQL = `
+        INSERT INTO movies (movie_id, title, genres, actors, overview, imdb_rating, premiere, runtime, language, year)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (movie_id) DO UPDATE SET
+          title = EXCLUDED.title,
+          genres = EXCLUDED.genres,
+          actors = EXCLUDED.actors,
+          overview = EXCLUDED.overview,
+          imdb_rating = EXCLUDED.imdb_rating,
+          premiere = EXCLUDED.premiere,
+          runtime = EXCLUDED.runtime,
+          language = EXCLUDED.language,
+          year = EXCLUDED.year
+      `;
+
+      for (const m of movies) {
+        await client.query(insertSQL, [
+          m.movie_id,
+          m.title,
+          m.genres,
+          m.actors,
+          m.overview,
+          m.imdb_rating,
+          m.premiere,
+          m.runtime,
+          m.language,
+          m.year,
+        ]);
+      }
+
+      await client.query("COMMIT");
+      console.log(`🎉 Successfully imported ${movies.length} movies!`);
+
+      // Tampilkan sample data
+      const sample = await client.query(
+        "SELECT movie_id, title, genres, imdb_rating, premiere, year FROM movies LIMIT 3",
+      );
+      console.log("\n📋 Sample data:");
+      sample.rows.forEach((row) => {
+        console.log(
+          `  - [${row.movie_id}] ${row.title} (${row.genres}) - Rating: ${row.imdb_rating} - Premiere: ${row.premiere}`,
+        );
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("❌ Import failed:", err);
+    } finally {
+      client.release();
+      await pool.end();
+    }
+  } catch (err) {
+    console.error("💥 Fatal:", err);
+
     process.exit(1);
   }
 }

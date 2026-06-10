@@ -1,6 +1,8 @@
 // Auth Service Layer
+// Uses NEXT_PUBLIC_API_URL for backend communication
 
-const API_BASE = '/api/auth';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_AUTH = `${API_BASE_URL}/api/auth`;
 
 export interface User {
   id: number;
@@ -75,11 +77,25 @@ export async function register(
   password: string,
   genres: string[]
 ): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE}/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, email, password, genres }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_AUTH}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password, genres }),
+    });
+  } catch {
+    throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+  }
+
+  // Handle non-JSON responses (e.g. HTML error pages)
+  const contentType = res.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    if (!res.ok) {
+      throw new Error(`Server error (HTTP ${res.status}). Coba lagi nanti.`);
+    }
+    throw new Error('Response dari server tidak valid. Periksa konfigurasi API URL.');
+  }
 
   const json = await res.json();
 
@@ -94,11 +110,25 @@ export async function login(
   email: string,
   password: string
 ): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_AUTH}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+  }
+
+  // Handle non-JSON responses
+  const contentType = res.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    if (!res.ok) {
+      throw new Error(`Server error (HTTP ${res.status}). Coba lagi nanti.`);
+    }
+    throw new Error('Response dari server tidak valid. Periksa konfigurasi API URL.');
+  }
 
   const json = await res.json();
 
