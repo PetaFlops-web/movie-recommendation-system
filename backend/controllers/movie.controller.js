@@ -6,7 +6,8 @@ import {
   findMovieByTitle,
   getTopByGenre,
   getByMultipleGenres,
-  getUserRecommendations
+  getUserRecommendations,
+  getMovieByTmdbId // Import fungsi service baru untuk TMDB ID
 } from '../services/movie.service.js';
 import { getContentBasedRecommendations } from '../services/ml.service.js';
 
@@ -30,11 +31,13 @@ export const listMovies = async (req, res) => {
 /**
  * GET /api/movies/:id
  * Get movie detail + Top 10 Content-Based Recommendations
+ * 🛠️ FIX: Menghapus parseInt kaku agar mendukung ID string/alphanumeric dari database lokal
  */
 export const movieDetail = async (req, res) => {
   try {
-    const movieId = parseInt(req.params.id);
-    if (isNaN(movieId)) {
+    const movieId = req.params.id; // 💡 Ambil ID asli tanpa dipaksa jadi Integer murni
+    
+    if (!movieId) {
       return errorResponse(res, 'ID film tidak valid', 400);
     }
 
@@ -47,7 +50,6 @@ export const movieDetail = async (req, res) => {
     let recommendations = [];
     try {
       const mlResult = await getContentBasedRecommendations(movie.movie_id, movie.title, 10);
-      // ✅ FIX: Ambil data recommendations dengan aman
       recommendations = mlResult?.recommendations || mlResult?.data?.recommendations || mlResult?.data || [];
     } catch (mlError) {
       console.error('ML Service error for detail:', mlError.message);
@@ -64,7 +66,6 @@ export const movieDetail = async (req, res) => {
 /**
  * GET /api/movies/recommendations/similar/:title
  * Input 1 judul film -> dapatkan 10 film paling mirip (Content-Based)
- * ✅ FIX: Handling response Python ML Service yang benar
  */
 export const similarMovies = async (req, res) => {
   try {
@@ -82,7 +83,6 @@ export const similarMovies = async (req, res) => {
     // 2. Panggil ML Service
     const mlResult = await getContentBasedRecommendations(foundMovie.movie_id, foundMovie.title, 10);
 
-    // ✅ FIX: Extract recommendations dari berbagai kemungkinan struktur response
     const recommendations = 
       mlResult?.recommendations || 
       mlResult?.data?.recommendations || 
@@ -213,5 +213,38 @@ export const userRecommendations = async (req, res) => {
   } catch (err) {
     console.error('User recommendation error:', err);
     return errorResponse(res, 'Gagal mendapatkan rekomendasi personal');
+  }
+};
+
+/**
+ * GET /api/movies/tmdb/:tmdbId
+ * Get movie detail by TMDB Movie ID + Top 10 Content-Based Recommendations
+ */
+export const movieDetailByTmdb = async (req, res) => {
+  try {
+    const tmdbId = parseInt(req.params.tmdbId);
+    if (isNaN(tmdbId)) {
+      return errorResponse(res, 'TMDB ID tidak valid', 400);
+    }
+
+    // Ambil data film berdasarkan movie_id dari TMDB
+    const movie = await getMovieByTmdbId(tmdbId);
+    if (!movie) {
+      return errorResponse(res, 'Film tidak ditemukan berdasarkan TMDB ID tersebut', 404);
+    }
+
+    // Panggil Python ML Service agar outputnya sama lengkapnya dengan rute id biasa
+    let recommendations = [];
+    try {
+      const mlResult = await getContentBasedRecommendations(movie.movie_id, movie.title, 10);
+      recommendations = mlResult?.recommendations || mlResult?.data?.recommendations || mlResult?.data || [];
+    } catch (mlError) {
+      console.error('ML Service error for TMDB detail:', mlError.message);
+    }
+
+    return successResponse(res, { movie, recommendations });
+  } catch (err) {
+    console.error('Movie detail by TMDB error:', err);
+    return errorResponse(res, err.message || 'Gagal mengambil detail film berdasarkan TMDB ID');
   }
 };

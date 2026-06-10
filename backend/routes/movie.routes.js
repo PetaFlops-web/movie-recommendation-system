@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   listMovies,
   movieDetail,
+  movieDetailByTmdb, // ➕ Pastikan nanti fungsi ini di-import dari controller
   similarMovies,
   topByGenre,
   recommendByGenre,
@@ -45,6 +46,15 @@ router.get('/recommendations/user/:userId', userRecommendations);
  * @access  Public
  */
 router.get('/top/:genre', topByGenre);
+
+/**
+ * ➕ BARU:
+ * @route   GET /api/movies/tmdb/:tmdbId
+ * @desc    Get movie detail by TMDB Movie ID
+ * @access  Public
+ * @note    Harus di atas /:id supaya kata "tmdb" tidak terbaca sebagai parameter :id
+ */
+router.get('/tmdb/:tmdbId', movieDetailByTmdb);
 
 /**
  * @route   GET /api/movies/:id
