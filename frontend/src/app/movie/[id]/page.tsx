@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   Clock,
@@ -12,8 +12,10 @@ import {
   Globe,
   Sparkles,
   Star,
+  Search,
   Users,
   Zap,
+  X,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
@@ -25,13 +27,29 @@ import { fetchMovieDetail } from "@/app/lib/api";
 import { useAuth } from "@/app/contexts/AuthContext";
 import CommentSection from "@/components/CommentSection";
 import InteractionsUserMovie from "@/components/IntrectionsUserMovie";
+import { fetchMovies } from '@/app/lib/api';
+
+
+function useDebounce(value: string, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 export default function MovieDetailPage() {
   const params = useParams();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<MovieFromAPI[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const { user, logout } = useAuth();
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const decodedTitle = decodeMovieTitle(params.id as string);
-  const { user, logout } = useAuth();
-
+  const debouncedSearch = useDebounce(searchQuery, 400);
   const [movie, setMovie] = useState<MovieFromAPI | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendationsByCategory>({
     hybrid: [],
@@ -39,6 +57,12 @@ export default function MovieDetailPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+
+  const handleLogout = () => {
+    logout();
+    router.replace('/login');
+  };
 
   useEffect(() => {
     if (!decodedTitle) return;
@@ -62,6 +86,27 @@ export default function MovieDetailPage() {
 
     load();
   }, [decodedTitle]);
+
+  useEffect(() => {
+      if (!debouncedSearch.trim()) {
+        setSearchResults([]);
+        setShowSearchResults(false);
+        return;
+      }
+      const doSearch = async () => {
+        setIsSearching(true);
+        setShowSearchResults(true);
+        try {
+          const data = await fetchMovies(1, 8, debouncedSearch);
+          setSearchResults(data.movies);
+        } catch {
+          setSearchResults([]);
+        } finally {
+          setIsSearching(false);
+        }
+      };
+      doSearch();
+    }, [debouncedSearch]);
 
   const backdropGradient =
     "radial-gradient(circle at center, rgba(0, 169, 255, 0.25) 0%, rgba(10, 22, 40, 0.98) 70%)";
@@ -132,17 +177,123 @@ export default function MovieDetailPage() {
         <div className="neon-grid" />
       </div>
 
-      {/* Header */}
       <header className="sticky top-0 z-50 w-full glass-panel border-b border-white/5 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 md:gap-6">
-          <Link href="/" className="flex items-center gap-3 shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-300 to-brand-200 flex items-center justify-center shadow-lg shadow-brand-300/20">
-              <Film className="w-5 h-5 text-white" />
+        {/* Tambahkan gap-3 md:gap-6 agar elemen tidak saling menempel di layar kecil */}
+        <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 md:gap-6">
+
+          {/* Logo - Beri shrink-0 agar ukurannya tidak tertekan oleh Search Bar */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div>
+              <span className="font-bold text-lg md:text-3xl tracking-tight text-white">
+                Smart<span className="text-brand-300 font-extrabold">Movie</span>
+              </span>
+              <span className="hidden sm:block text-[10px] text-slate-400 tracking-widest uppercase font-semibold">
+                Sistem Rekomendasi
+              </span>
             </div>
-            <span className="font-bold text-xl tracking-tight text-white">
-              Smart<span className="text-brand-300 font-extrabold">Movie</span>
-            </span>
-          </Link>
+          </div>
+
+          {/* SEARCH - Beri flex-1 agar mengisi sisa ruang tengah secara otomatis dan dinamis */}
+          <div ref={searchRef} className="relative flex-1 max-w-2xl mx-auto">
+            <div className="relative w-full">
+              <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-brand-300/60" />
+              <input
+                id="search-movies"
+                type="text"
+                placeholder="Cari film..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (searchResults.length > 0) setShowSearchResults(true);
+                }}
+                // Penyesuaian responsif: py-2 di HP, py-3.5 di Desktop. Ukuran teks lebih kecil di HP.
+                className="search-input w-full pr-10 md:pr-14 pl-9 md:pl-12 py-2 md:py-3.5 rounded-xl md:rounded-2xl text-white text-sm md:text-base placeholder:text-slate-500 font-medium bg-white/5 border border-white/10 focus:border-brand-300/50 focus:bg-white/10 outline-none transition-all"
+              />
+
+              {searchQuery && !isSearching && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowSearchResults(false);
+                  }}
+                  className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                >
+                  <X className="w-3 h-3 md:w-3.5 md:h-3.5 text-slate-400" />
+                </button>
+              )}
+
+              {isSearching && (
+                <div className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2">
+                  <div className="loading-spinner w-4 h-4 md:w-5 md:h-5" />
+                </div>
+              )}
+            </div>
+
+            {/* Dropdown Pencarian */}
+            <AnimatePresence>
+              {showSearchResults && searchQuery.trim() && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-full left-0 right-0 mt-2 glass-panel rounded-xl md:rounded-2xl border border-brand-300/20 shadow-2xl overflow-hidden z-50 max-h-[300px] md:max-h-[400px] overflow-y-auto"
+                >
+                  {isSearching ? (
+                    <div className="p-4 md:p-6 text-center">
+                      <div className="loading-spinner mx-auto mb-2 md:mb-3" />
+                      <p className="text-xs md:text-sm text-slate-400">Mencari film...</p>
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="p-4 md:p-6 text-center">
+                      <AlertCircle className="w-6 h-6 md:w-8 md:h-8 text-slate-600 mx-auto mb-2" />
+                      <p className="text-xs md:text-sm text-slate-400">
+                        Film tidak ditemukan untuk &ldquo;{searchQuery}&rdquo;
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="py-1.5 md:py-2">
+                      {searchResults.map((movie, i) => (
+                        <Link
+                          key={`${movie.title}-${i}`}
+                          href={`/movie/${encodeMovieTitle(movie.title)}`}
+                          onClick={() => setShowSearchResults(false)}
+                        >
+                          <div className="px-3 md:px-4 py-2.5 md:py-3 hover:bg-white/5 transition-colors flex items-center justify-between group">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs md:text-sm font-semibold text-white group-hover:text-brand-300 transition-colors truncate">
+                                {movie.title}
+                              </h4>
+                              <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1">
+                                {movie.year && <span>{movie.year}</span>}
+                                {movie.genre && movie.genre !== 'nan' && (
+                                  <>
+                                    <span className="w-1 h-1 rounded-full bg-slate-600" />
+                                    <span className="truncate">{movie.genre}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 md:gap-2 ml-2 md:ml-3 shrink-0">
+                              {movie.imdb_score > 0 && (
+                                <span className="flex items-center gap-1 text-[10px] md:text-[11px] font-bold text-amber-400">
+                                  <Star className="w-2.5 h-2.5 md:w-3 md:h-3 fill-amber-400" />
+                                  {formatIMDBScore(movie.imdb_score)}
+                                </span>
+                              )}
+                              <ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-600 group-hover:text-brand-300 transition-colors" />
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* User Info + Logout - Beri shrink-0 */}
           <div className="flex items-center gap-3 shrink-0">
             <Link href="/profile" className="hidden sm:flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-brand-300/15 border border-brand-300/25 flex items-center justify-center">
@@ -153,13 +304,15 @@ export default function MovieDetailPage() {
               <span className="text-sm font-semibold text-slate-300">{user?.username || 'User'}</span>
             </Link>
             <button
-              onClick={() => { logout(); router.replace('/login'); }}
+              onClick={handleLogout}
+              // Padding sedikit diperkecil di mobile
               className="p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-red-500/10 flex items-center gap-1.5 transition-all"
             >
               <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
+
         </div>
       </header>
 
@@ -330,7 +483,6 @@ export default function MovieDetailPage() {
                 scrollRef: React.RefObject<HTMLDivElement | null>,
                 label: string,
                 description: string,
-                accentColor: string,
               ) => {
                 if (items.length === 0) return null;
                 return (
@@ -340,7 +492,7 @@ export default function MovieDetailPage() {
                         <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                           <span
                             className="inline-block w-2 h-2 rounded-full"
-                            style={{ backgroundColor: accentColor }}
+                            style={{ backgroundColor: label === "Recommendations by Synopsis" ? "#A855F7" : "#3B82F6" }}
                           />
                           {label}
                         </h3>
@@ -460,16 +612,14 @@ export default function MovieDetailPage() {
                   {renderRecCarousel(
                     recommendations.hybrid,
                     hybridScrollRef,
-                    "Hybrid Recommendations",
-                    "Kombinasi content-based & collaborative filtering",
-                    "#00A9FF",
+                    "Recommendations by Synopsis",
+                    "Rekomendasi berdasarkan sinopsis",
                   )}
                   {renderRecCarousel(
                     recommendations.tfidf,
                     tfidfScrollRef,
-                    "TF-IDF Recommendations",
-                    "Berdasarkan kemiripan sinopsis menggunakan TF-IDF",
-                    "#A855F7",
+                    "Recommendations by Similarity",
+                    "Rekomendasi berdasarkan kemiripan fitur",
                   )}
                 </>
               );
