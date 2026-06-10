@@ -1,8 +1,15 @@
-import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse, HealthResponse } from '@/types/movieType';
+import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse } from '@/types/movieType';
+
+// ============================================================
+// API Configuration — reads from .env (NEXT_PUBLIC_API_URL)
+// ============================================================
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API_BASE = `${API_BASE_URL}/api`;
 
+// ============================================================
+// Data Mapping Helpers
+// ============================================================
 
 function parseRating(value: unknown): number {
   if (value === undefined || value === null || value === '' || value === 'nan') return 0;
@@ -31,6 +38,7 @@ function mapMovie(raw: Record<string, unknown>): MovieFromAPI {
     runtime: parseRuntimeValue(raw.runtime),
     language: (raw.language as string) || undefined,
     premiere: (raw.premiere as string) || undefined,
+    poster_url: (raw.poster_url as string) || undefined,
   };
 }
 
@@ -42,7 +50,7 @@ function mapRecommendation(raw: Record<string, unknown>): MovieWithSimilarity {
 }
 
 // ============================================================
-// Fetch helper with error handling for non-JSON responses
+// Fetch Helper with Error Handling
 // ============================================================
 
 async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
@@ -66,6 +74,9 @@ async function safeJsonParse(res: Response): Promise<Record<string, unknown>> {
   return res.json();
 }
 
+// ============================================================
+// Movie API Functions
+// ============================================================
 
 export async function fetchMovies(
   page: number = 1,
@@ -94,7 +105,9 @@ export async function fetchMovies(
   const totalPages =
     pagination.pages ??
     (Math.ceil((pagination.total ?? rawMovies.length) / (pagination.limit || limit)) || 1);
-
+  console.log('API Response:', {
+    rawMovies,
+  });
   return {
     success: Boolean(json?.success),
     page: pagination.page ?? page,
@@ -144,52 +157,4 @@ export async function fetchMovieDetail(
     movie: found,
     recommendations: [],
   };
-}
-
-export async function fetchHealthCheck(): Promise<HealthResponse> {
-  const res = await safeFetch(`${API_BASE}/health`);
-  if (!res.ok) {
-    throw new Error(`Health check gagal (HTTP ${res.status})`);
-  }
-  return res.json();
-}
-
-
-
-export function formatIMDBScore(score: number): string {
-  return score ? score.toFixed(1) : 'N/A';
-}
-
-export function formatRuntime(minutes: number | null | undefined): string {
-  if (!minutes) return '';
-  const value = Number(minutes);
-  if (!Number.isFinite(value) || value <= 0) return '';
-  const hours = Math.floor(value / 60);
-  const mins = value % 60;
-  if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  return `${mins}m`;
-}
-
-export function formatSimilarityScore(score: number): string {
-  return `${(score * 100).toFixed(1)}%`;
-}
-
-export function encodeMovieTitle(title: string): string {
-  return encodeURIComponent(title);
-}
-
-export function decodeMovieTitle(encoded: string): string {
-  return decodeURIComponent(encoded);
-}
-
-export function parseGenres(genreString: string): string[] {
-  if (!genreString || genreString === 'nan') return [];
-  return genreString.split(',').map((g) => g.trim()).filter(Boolean);
-}
-
-export function getScoreColor(score: number): string {
-  if (score >= 8) return '#00A9FF';
-  if (score >= 7) return '#89CFF3';
-  if (score >= 6) return '#A0E9FF';
-  return '#CDF5FD';
 }

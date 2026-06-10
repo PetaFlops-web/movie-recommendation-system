@@ -3,6 +3,7 @@ import "dotenv/config";
 
 const { Pool } = pg;
 
+
 // === 🗄️ DATABASE POOL INITIALIZATION ===
 // Gunakan let agar bisa di-assign nanti
 let pool;
@@ -164,6 +165,7 @@ export const initDB = async () => {
 
 // === 📦 EXPORTS ===
 
+
 // Query helper (wajib pakai await)
 export const query = (text, params) => {
   if (!pool) {
@@ -185,3 +187,4 @@ export const closeDB = async () => {
     console.log('✅ Database connection closed');
   }
 };
+

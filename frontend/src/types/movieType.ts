@@ -7,6 +7,7 @@ export interface MovieFromAPI {
   imdb_score: number;
   imdb_rating?: string | number;
   year: string;
+  poster_url?: string;
   runtime?: number;
   language?: string;
   premiere?: string;

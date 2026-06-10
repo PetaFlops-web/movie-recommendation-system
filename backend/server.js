@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config'; // Trigger reload
 import app from './app.js';
 
 const PORT = parseInt(process.env.PORT) || 3000;

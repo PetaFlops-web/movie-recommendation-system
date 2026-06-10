@@ -1,8 +1,11 @@
-// Auth Service Layer
-// Uses NEXT_PUBLIC_API_URL for backend communication
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = 'http://localhost:3001';
 const API_AUTH = `${API_BASE_URL}/api/auth`;
+
+const STORAGE_KEY = process.env.NEXT_PUBLIC_JWT_STORAGE_KEY || 'smartmovie_token';
+const USER_STORAGE_KEY = `${STORAGE_KEY}_user`;
+const PREFS_STORAGE_KEY = `${STORAGE_KEY}_preferences`;
+
+
 
 export interface User {
   id: number;
@@ -20,28 +23,24 @@ export interface AuthResponse {
   };
 }
 
-// ============================================================
-// Token Management
-// ============================================================
-
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('smartmovie_token');
+  return localStorage.getItem(STORAGE_KEY);
 }
 
 export function setToken(token: string): void {
-  localStorage.setItem('smartmovie_token', token);
+  localStorage.setItem(STORAGE_KEY, token);
 }
 
 export function removeToken(): void {
-  localStorage.removeItem('smartmovie_token');
-  localStorage.removeItem('smartmovie_user');
-  localStorage.removeItem('smartmovie_preferences');
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(USER_STORAGE_KEY);
+  localStorage.removeItem(PREFS_STORAGE_KEY);
 }
 
 export function getSavedUser(): User | null {
   if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem('smartmovie_user');
+  const raw = localStorage.getItem(USER_STORAGE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -52,7 +51,7 @@ export function getSavedUser(): User | null {
 
 export function getSavedPreferences(): string[] {
   if (typeof window === 'undefined') return [];
-  const raw = localStorage.getItem('smartmovie_preferences');
+  const raw = localStorage.getItem(PREFS_STORAGE_KEY);
   if (!raw) return [];
   try {
     return JSON.parse(raw);
@@ -63,8 +62,8 @@ export function getSavedPreferences(): string[] {
 
 export function saveAuth(data: AuthResponse['data']): void {
   setToken(data.token);
-  localStorage.setItem('smartmovie_user', JSON.stringify(data.user));
-  localStorage.setItem('smartmovie_preferences', JSON.stringify(data.preferences));
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+  localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(data.preferences));
 }
 
 // ============================================================
@@ -117,6 +116,7 @@ export async function login(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
+    console.log('Login response status:', res.status);
   } catch {
     throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
   }
