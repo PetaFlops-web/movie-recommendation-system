@@ -9,6 +9,8 @@ import { initDB } from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import movieRoutes from './routes/movie.routes.js';
 import healthRoutes from './routes/health.routes.js';
+import profileRoutes from './routes/profileRoutes.js';      // ✅ BARU
+import socialRoutes from './routes/socialRoutes.js';        // ✅ BARU
 
 const app = express();
 
@@ -16,7 +18,7 @@ const app = express();
 app.use(helmet());
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3001',  // ✅ Sesuaikan port frontend
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -43,6 +45,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/health', healthRoutes);
 
+// ✅ TAMBAHKAN ROUTES BARU INI:
+app.use('/api/users', profileRoutes);   // Profile: GET/PUT /api/users/:userId/profile
+app.use('/api', socialRoutes);          // Social: POST/GET /api/movies/:id/comments, /like, /share
+
 // === 🏠 ROOT ENDPOINT ===
 app.get('/', (req, res) => {
   res.json({
@@ -58,6 +64,15 @@ app.get('/', (req, res) => {
       movies: {
         list: 'GET /api/movies?page=1&limit=20&search=action',
         detail: 'GET /api/movies/:id (returns movie detail + Top 10 recommendations)'
+      },
+      users: {
+        profile: 'GET /api/users/:userId/profile | PUT /api/users/:userId/profile'
+      },
+      social: {
+        comments: 'GET/POST /api/movies/:movieId/comments',
+        like: 'POST /api/movies/:movieId/like',
+        likes: 'GET /api/movies/:movieId/likes',
+        share: 'POST /api/movies/:movieId/share'
       },
       health: 'GET /api/health'
     }
