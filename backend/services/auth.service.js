@@ -20,9 +20,9 @@ export const registerUser = async ({ username, email, password, genres }) => {
   const salt = await bcrypt.genSalt(12);
   const passwordHash = await bcrypt.hash(password, salt);
 
-  // Insert user
+  // ✅ FIX: Ganti password_hash → password
   const newUser = await query(
-    'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
+    'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
     [username, email, passwordHash]
   );
   const user = newUser.rows[0];
@@ -55,8 +55,8 @@ export const loginUser = async ({ email, password }) => {
     return { error: 'Email atau password salah', status: 400 };
   }
 
-  // Verify password
-  const isMatch = await bcrypt.compare(password, user.password_hash);
+  // ✅ FIX: Ganti user.password_hash → user.password
+  const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     return { error: 'Email atau password salah', status: 400 };
   }
