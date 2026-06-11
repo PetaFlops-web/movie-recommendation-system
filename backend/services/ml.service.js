@@ -1,9 +1,20 @@
 import axios from 'axios';
 
-const PYTHON_URL = process.env.PYTHON_SERVICE_URL;
+/**
+ * Helper untuk mendapatkan URL Python ML Service secara aman dan dinamis.
+ * Mengurangi risiko error 'Invalid URL' akibat modul dotenv belum termuat sempurna 
+ * atau adanya typo slash ganda di file .env.
+ */
+const getPythonUrl = () => {
+  // Mengambil URL dari .env, jika kosong akan menggunakan fallback URL Railway Python kamu
+  const url = process.env.PYTHON_SERVICE_URL || 'https://python-service-production.up.railway.app';
+  
+  // Membersihkan karakter '/' di ujung URL jika ada (contoh: http://domain.com/ menjadi http://domain.com)
+  return url.replace(/\/$/, '');
+};
 
 /**
- * Get content-based recommendations from Python ML Service
+ * Get Content-Based Recommendations (TF-IDF / Tag-based) dari Python ML Service
  */
 export const getContentBasedRecommendations = async (movieId, movieTitle, numRecommendations = 10) => {
   if (!movieTitle && !movieId) {
@@ -16,17 +27,18 @@ export const getContentBasedRecommendations = async (movieId, movieTitle, numRec
     num_recommendations: parseInt(numRecommendations) || 10
   };
 
-  console.log('ML Request:', payload);
+  const targetUrl = `${getPythonUrl()}/recommend/content-based`;
+  console.log('ML Request (Content-Based) to:', targetUrl);
+  console.log('Payload:', payload);
 
   try {
-    const response = await axios.post(`${PYTHON_URL}/recommend/content-based`, payload, {
+    const response = await axios.post(targetUrl, payload, {
       headers: { 'Content-Type': 'application/json' },
-      timeout: 15000
+      timeout: 15000 // Timeout 15 detik untuk mengatasi cold start di Railway
     });
 
-    console.log(`ML Response: ${response.data.recommendations?.length || 0} recommendations`);
+    console.log(`ML Response (Content-Based): ${response.data.recommendations?.length || 0} recommendations`);
 
-    // Return struktur yang jelas & konsisten
     return {
       success: true,
       recommendations: response.data.recommendations || response.data.data?.recommendations || [],
@@ -34,19 +46,18 @@ export const getContentBasedRecommendations = async (movieId, movieTitle, numRec
     };
 
   } catch (error) {
-    console.error('ML Service Error:', error.message);
-    
+    console.error('ML Service Error (Content-Based):', error.message);
     return {
       success: false,
       recommendations: [],
-      input: null,
+      input: payload,
       error: error.message
     };
   }
 };
 
 /**
- * Get Hybrid recommendations from Python ML Service
+ * Get Hybrid Recommendations (Gabungan Collaborative + Content) dari Python ML Service
  */
 export const getContentBasedRecommendationHybrid = async (movieId, movieTitle, numRecommendations = 10) => {
   if (!movieTitle && !movieId) {
@@ -57,14 +68,16 @@ export const getContentBasedRecommendationHybrid = async (movieId, movieTitle, n
     movie_id: movieId || null,
     movie_title: movieTitle || null,
     num_recommendations: parseInt(numRecommendations) || 10,
-    min_similarity: 0.1, // Sesuai parameter hybrid Anda
-    genre_filter: true   // Sesuai parameter hybrid Anda
+    min_similarity: 0.1, // Parameter similarity bawaan sistem hybrid kamu
+    genre_filter: true   // Filter berdasarkan preferensi genre user
   };
 
-  console.log('ML Request (Hybrid):', payload);
+  const targetUrl = `${getPythonUrl()}/recommend/hybrid`;
+  console.log('ML Request (Hybrid) to:', targetUrl);
+  console.log('Payload:', payload);
 
   try {
-    const response = await axios.post(`${PYTHON_URL}/recommend/hybrid`, payload, {
+    const response = await axios.post(targetUrl, payload, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 15000
     });
@@ -88,25 +101,25 @@ export const getContentBasedRecommendationHybrid = async (movieId, movieTitle, n
   }
 };
 
-
 /**
- * Health check untuk Python ML Service
+ * Health check untuk mendeteksi apakah Python ML Service aktif atau sedang down
  */
 export const healthCheck = async () => {
+  const targetUrl = `${getPythonUrl()}/health`;
   try {
-    const response = await axios.get(`${PYTHON_URL}/health`, { timeout: 3000 });
+    const response = await axios.get(targetUrl, { timeout: 5000 });
     return { status: 'healthy', ...response.data };
   } catch (error) { 
     return { 
       status: 'unreachable', 
       error: error.message,
-      note: 'Python service mungkin down atau URL salah'
+      note: 'Python service mungkin down, sleeping, atau URL salah konfigurasi.'
     };
   }
 };
 
 /**
- * Handle ML service errors
+ * Error utility handler khusus untuk membaca status error dari ML Service
  */
 export const handleMLError = (error, movieTitle, movieId) => {
   if (error.response?.status === 404) {
@@ -116,7 +129,7 @@ export const handleMLError = (error, movieTitle, movieId) => {
     return 'ML Service tidak tersedia. Cek koneksi atau URL service.';
   }
   if (error.code === 'ECONNABORTED') {
-    return 'ML Service timeout.';
+    return 'ML Service mengalami timeout (Waktu habis).';
   }
   return error.message || 'Gagal menghubungi ML service';
 };
