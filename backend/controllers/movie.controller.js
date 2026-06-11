@@ -8,7 +8,7 @@ import {
   getByMultipleGenres,
   getUserRecommendations,
   getMovieByTmdbId,
-  
+  getTrendingMovies,
 } from '../services/movie.service.js';
 import { getContentBasedRecommendations, getContentBasedRecommendationHybrid } from '../services/ml.service.js';
 
@@ -46,6 +46,8 @@ export const listMovies = async (req, res) => {
     return errorResponse(res, 'Gagal mengambil daftar film');
   }
 };
+
+
 
 /**
  * GET /api/movies/:id
@@ -307,5 +309,24 @@ export const movieDetailByTmdb = async (req, res) => {
   } catch (err) {
     console.error('Movie detail by TMDB error:', err);
     return errorResponse(res, err.message || 'Gagal mengambil detail film berdasarkan TMDB ID');
+  }
+};
+
+/**
+ * GET /api/movies/trending
+ * Get top trending movies based on highest IMDb rating
+ * Query params: ?page=1&limit=10
+ */
+export const trendingMovies = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+
+    const data = await getTrendingMovies({ page, limit });
+
+    return successResponse(res, data, 'Top trending movies berhasil diambil');
+  } catch (err) {
+    console.error('Trending movies error:', err);
+    return errorResponse(res, 'Gagal mengambil daftar film trending');
   }
 };

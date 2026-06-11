@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
-  Film,
   Mail,
   Lock,
   ArrowRight,
@@ -76,11 +75,7 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-brand-300 to-brand-200 flex items-center justify-center shadow-lg shadow-brand-300/30">
-              <Film className="w-6 h-6 text-white" />
-            </div>
-          </div>
+      
           <h1 className="text-3xl font-black text-white tracking-tight">
             Smart<span className="text-brand-300">Movie</span>
           </h1>

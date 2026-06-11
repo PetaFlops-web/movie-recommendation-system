@@ -76,7 +76,8 @@ app.get('/', (req, res) => {
       },
       movies: {
         list: 'GET /api/movies?page=1&limit=20&search=action',
-        detail: 'GET /api/movies/:id (returns movie detail + Top 10 recommendations)'
+        detail: 'GET /api/movies/:id (returns movie detail + Top 10 recommendations)',
+        trending: 'GET /api/movies/trending?page=1&limit=10 (top trending by highest rating)'
       },
       users: {
         profile: 'GET /api/users/:userId/profile | PUT /api/users/:userId/profile'

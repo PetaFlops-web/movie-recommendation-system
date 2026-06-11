@@ -6,7 +6,8 @@ import {
   similarMovies,
   topByGenre,
   recommendByGenre,
-  userRecommendations
+  userRecommendations,
+  trendingMovies
 } from '../controllers/movie.controller.js';
 
 const router = Router();
@@ -55,6 +56,14 @@ router.get('/top/:genre', topByGenre);
  * @note    Harus di atas /:id supaya kata "tmdb" tidak terbaca sebagai parameter :id
  */
 router.get('/tmdb/:tmdbId', movieDetailByTmdb);
+
+/**
+ * @route   GET /api/movies/trending
+ * @desc    Get top trending movies based on highest IMDb rating
+ * @access  Public
+ * @query   page (default: 1), limit (default: 10, max: 50)
+ */
+router.get('/trending', trendingMovies);
 
 /**
  * @route   GET /api/movies/:id

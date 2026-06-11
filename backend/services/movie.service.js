@@ -218,3 +218,37 @@ export const getMovieByTmdbId = async (tmdbId) => {
 
   return addPosterUrl(rows[0]);
 };
+
+/**
+ * Get top trending movies based on highest IMDb rating
+ * Supports pagination via page & limit
+ */
+export const getTrendingMovies = async ({ page = 1, limit = 10 }) => {
+  const offset = (page - 1) * limit;
+
+  const moviesRes = await query(`
+    SELECT id, movie_id, title, genres, actors, overview, imdb_rating, year, poster_path
+    FROM movies
+    WHERE imdb_rating IS NOT NULL
+    ORDER BY imdb_rating DESC
+    LIMIT $1 OFFSET $2
+  `, [limit, offset]);
+
+  const totalRes = await query(
+    'SELECT COUNT(*) as count FROM movies WHERE imdb_rating IS NOT NULL'
+  );
+
+  const rows = extractRows(moviesRes);
+  const totalRows = extractRows(totalRes);
+  const total = parseInt(totalRows[0]?.count || 0, 10);
+
+  return {
+    movies: rows.map(addPosterUrl),
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  };
+};
