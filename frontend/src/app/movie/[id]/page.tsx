@@ -88,33 +88,34 @@ export default function MovieDetailPage() {
   }, [decodedTitle]);
 
   useEffect(() => {
-      if (!debouncedSearch.trim()) {
+    if (!debouncedSearch.trim()) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+    const doSearch = async () => {
+      setIsSearching(true);
+      setShowSearchResults(true);
+      try {
+        const data = await fetchMovies(1, 8, debouncedSearch);
+        setSearchResults(data.movies);
+      } catch {
         setSearchResults([]);
-        setShowSearchResults(false);
-        return;
+      } finally {
+        setIsSearching(false);
       }
-      const doSearch = async () => {
-        setIsSearching(true);
-        setShowSearchResults(true);
-        try {
-          const data = await fetchMovies(1, 8, debouncedSearch);
-          setSearchResults(data.movies);
-        } catch {
-          setSearchResults([]);
-        } finally {
-          setIsSearching(false);
-        }
-      };
-      doSearch();
-    }, [debouncedSearch]);
+    };
+    doSearch();
+  }, [debouncedSearch]);
 
   const backdropGradient =
     "radial-gradient(circle at center, rgba(0, 169, 255, 0.25) 0%, rgba(10, 22, 40, 0.98) 70%)";
   const glowColor = "#00A9FF";
 
   // Scroll ref and handler for horizontal recommendations
-  const hybridScrollRef = useRef<HTMLDivElement>(null);
-  const tfidfScrollRef = useRef<HTMLDivElement>(null);
+  const hybridScrollRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+  const tfidfScrollRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+
   const scrollByAmount = (ref: React.RefObject<HTMLDivElement | null>, direction: "left" | "right") => {
     if (ref.current) {
       const amount = direction === "left" ? -360 : 360;
@@ -158,9 +159,9 @@ export default function MovieDetailPage() {
   const actors =
     movie.actors && movie.actors !== "nan"
       ? movie.actors
-          .split(",")
-          .map((a) => a.trim())
-          .filter(Boolean)
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean)
       : [];
   const runtimeDisplay = movie.runtime
     ? formatRuntime(Number(movie.runtime) || null)
@@ -480,10 +481,11 @@ export default function MovieDetailPage() {
             {(() => {
               const renderRecCarousel = (
                 items: MovieWithSimilarity[],
-                scrollRef: React.RefObject<HTMLDivElement | null>,
+                scrollRef: React.RefObject<HTMLDivElement>,
                 label: string,
                 description: string,
               ) => {
+
                 if (items.length === 0) return null;
                 return (
                   <div className="mb-10">
@@ -573,8 +575,8 @@ export default function MovieDetailPage() {
                                   </h3>
                                   <p className="text-[11px] text-slate-400/80 leading-relaxed line-clamp-2 font-light">
                                     {rec.overview &&
-                                    rec.overview !== "nan" &&
-                                    rec.overview.trim() !== "" ? (
+                                      rec.overview !== "nan" &&
+                                      rec.overview.trim() !== "" ? (
                                       rec.overview
                                     ) : (
                                       <span className="italic text-slate-500/60">

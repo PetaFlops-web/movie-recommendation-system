@@ -1,48 +1,57 @@
 'use client';
-import { MovieFromAPI } from '@/types/movieType';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   Film,
   TrendingUp,
   Star,
-  Sparkles,
-  ChevronRight,
   AlertCircle,
+  ChevronRight,
+  ChevronLeft,
   X,
   LogOut,
+  Sparkles
 } from 'lucide-react';
-import Image from 'next/image';
-import { formatIMDBScore, parseGenres, encodeMovieTitle } from '@/helpers/jsosParser';
-import SkeletonCard from '@/components/SkeletonCard';
-import MovieCard from '@/components/card';
-import HealthIndicator from '@/components/HealthIndicator';
-import { fetchMovies } from './lib/api';
-import { useAuth } from './contexts/AuthContext';
 
-function useDebounce(value: string, delay: number) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
+import { useAuth } from '@/app/contexts/AuthContext';
+import { fetchMovies } from '@/app/lib/api';
+import { MovieFromAPI } from '@/types/movieType';
+import MovieCard from '@/components/card';
+import SkeletonCard from '@/components/SkeletonCard';
+
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    const handler = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(handler);
   }, [value, delay]);
-  return debouncedValue;
+  return debounced;
+}
+
+function parseGenres(genre?: string): string[] {
+  if (!genre || genre === 'nan') return [];
+  return genre.split(',').map((g) => g.trim()).filter(Boolean);
+}
+
+function formatIMDBScore(score?: number): string {
+  if (!score) return '-';
+  return score.toFixed(1);
+}
+
+function encodeMovieTitle(title: string): string {
+  return encodeURIComponent(title);
 }
 
 const GENRE_LIST = [
   'Drama', 'Comedy', 'Documentary', 'Thriller', 'Romance',
   'Action', 'Horror', 'Crime', 'Animation', 'Sci-Fi',
   'Mystery', 'Family', 'Adventure', 'Fantasy',
-];
-
-
-const images = [
-  "https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?w=1600&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1470770841072-f978cbd4ee04?w=1600&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1600&auto=format&fit=crop",
 ];
 
 export default function Home() {
@@ -55,8 +64,9 @@ export default function Home() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const debouncedSearch = useDebounce(searchQuery, 400);
+
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered] = useState(false);
   const [popularMovies, setPopularMovies] = useState<MovieFromAPI[]>([]);
   const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [popularPage, setPopularPage] = useState(1);
@@ -71,25 +81,25 @@ export default function Home() {
 
   const [error, setError] = useState<string | null>(null);
 
-
-  // ---- Auth Guard ----
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace('/login');
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // ---- Logout ----
   const handleLogout = () => {
     logout();
     router.replace('/login');
   };
-  const nextSlide = () => {
-    setCurrentIndex((prevIndex) =>
-      prevIndex === images.length - 1 ? 0 : prevIndex + 1
-    );
-  };
-  // ---- Load Popular ----
+
+  const heroMovies = trendingMovies.slice(0, 5);
+  const nextSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev + 1) % heroMovies.length);
+  }, [heroMovies.length]);
+  const prevSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev - 1 + heroMovies.length) % heroMovies.length);
+  }, [heroMovies.length]);
+
   const loadPopularMovies = useCallback(async (page: number) => {
     setIsLoadingPopular(true);
     setError(null);
@@ -105,12 +115,6 @@ export default function Home() {
     }
   }, []);
 
-  const prevSlide = () => {
-    setCurrentIndex((prevIndex) =>
-      prevIndex === 0 ? images.length - 1 : prevIndex - 1
-    );
-  };
-  // ---- Load Trending ----
   const loadTrendingMovies = useCallback(async () => {
     setIsLoadingTrending(true);
     try {
@@ -127,13 +131,11 @@ export default function Home() {
     }
   }, []);
 
-  // ---- Init ----
   useEffect(() => {
     loadPopularMovies(1);
     loadTrendingMovies();
   }, [loadPopularMovies, loadTrendingMovies]);
 
-  // ---- Search ----
   useEffect(() => {
     if (!debouncedSearch.trim()) {
       setSearchResults([]);
@@ -155,7 +157,6 @@ export default function Home() {
     doSearch();
   }, [debouncedSearch]);
 
-  // ---- Genre filter ----
   useEffect(() => {
     if (!selectedGenre) {
       setGenreMovies([]);
@@ -176,18 +177,11 @@ export default function Home() {
   }, [selectedGenre]);
 
   useEffect(() => {
-    // Jika gambar di-hover, hentikan interval otomatis
-    if (isHovered) return;
+    if (isHovered || heroMovies.length === 0) return;
+    const interval = setInterval(nextSlide, 3000);
+    return () => clearInterval(interval);
+  }, [isHovered, nextSlide, heroMovies.length]);
 
-    const slideInterval = setInterval(() => {
-      nextSlide();
-    }, 3000); // Gambar akan bergeser setiap 3000ms (3 detik)
-
-    // Membersihkan interval agar tidak terjadi memory leak
-    return () => clearInterval(slideInterval);
-  }, [isHovered, currentIndex]);
-
-  // ---- Outside click ----
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -198,7 +192,6 @@ export default function Home() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ---- Auth Loading Guard ----
   if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center cinematic-bg">
@@ -218,31 +211,22 @@ export default function Home() {
         <div className="neon-grid" />
       </div>
 
-      {/* ============================================================ */}
-      {/* HEADER / NAVBAR — dengan User Info + Logout                  */}
-      {/* ============================================================ */}
+      {/* Navbar */}
       <header className="sticky top-0 z-50 w-full glass-panel border-b border-white/5 backdrop-blur-md">
-        {/* Tambahkan gap-3 md:gap-6 agar elemen tidak saling menempel di layar kecil */}
         <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 md:gap-6">
-
-          {/* Logo - Beri shrink-0 agar ukurannya tidak tertekan oleh Search Bar */}
           <div className="flex items-center gap-3 shrink-0">
-            <div>
-              <span className="font-bold text-lg md:text-3xl tracking-tight text-white">
-                Smart<span className="text-brand-300 font-extrabold">Movie</span>
-              </span>
-              <span className="hidden sm:block text-[10px] text-slate-400 tracking-widest uppercase font-semibold">
-                Sistem Rekomendasi
-              </span>
-            </div>
+            <span className="font-bold text-lg md:text-3xl tracking-tight text-white">
+              Smart<span className="text-brand-300 font-extrabold">Movie</span>
+            </span>
+            <span className="hidden sm:block text-[10px] text-slate-400 tracking-widest uppercase font-semibold">
+              Sistem Rekomendasi
+            </span>
           </div>
 
-          {/* SEARCH - Beri flex-1 agar mengisi sisa ruang tengah secara otomatis dan dinamis */}
           <div ref={searchRef} className="relative flex-1 max-w-2xl mx-auto">
             <div className="relative w-full">
               <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-brand-300/60" />
               <input
-                id="search-movies"
                 type="text"
                 placeholder="Cari film..."
                 value={searchQuery}
@@ -250,10 +234,8 @@ export default function Home() {
                 onFocus={() => {
                   if (searchResults.length > 0) setShowSearchResults(true);
                 }}
-                // Penyesuaian responsif: py-2 di HP, py-3.5 di Desktop. Ukuran teks lebih kecil di HP.
                 className="search-input w-full pr-10 md:pr-14 pl-9 md:pl-12 py-2 md:py-3.5 rounded-xl md:rounded-2xl text-white text-sm md:text-base placeholder:text-slate-500 font-medium bg-white/5 border border-white/10 focus:border-brand-300/50 focus:bg-white/10 outline-none transition-all"
               />
-
               {searchQuery && !isSearching && (
                 <button
                   onClick={() => {
@@ -265,7 +247,6 @@ export default function Home() {
                   <X className="w-3 h-3 md:w-3.5 md:h-3.5 text-slate-400" />
                 </button>
               )}
-
               {isSearching && (
                 <div className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2">
                   <div className="loading-spinner w-4 h-4 md:w-5 md:h-5" />
@@ -273,7 +254,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* Dropdown Pencarian */}
             <AnimatePresence>
               {showSearchResults && searchQuery.trim() && (
                 <motion.div
@@ -337,7 +317,6 @@ export default function Home() {
             </AnimatePresence>
           </div>
 
-          {/* User Info + Logout - Beri shrink-0 */}
           <div className="flex items-center gap-3 shrink-0">
             <Link href="/profile" className="hidden sm:flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-brand-300/15 border border-brand-300/25 flex items-center justify-center">
@@ -349,76 +328,157 @@ export default function Home() {
             </Link>
             <button
               onClick={handleLogout}
-              // Padding sedikit diperkecil di mobile
               className="p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-white/[0.02] border border-white/5 hover:border-red-500/30 hover:bg-red-500/10 flex items-center gap-1.5 transition-all"
             >
               <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
-
         </div>
       </header>
 
-      {/* ============================================================ */}
-      {/* MAIN CONTENT                                                 */}
-      {/* ============================================================ */}
       <main className="mx-auto pb-20">
-
-        {/* HERO SECTION */}
-        <section className="pb-12 text-center">
-          <div
-            className="relative w-full h-[80vh] group overflow-hidden"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-          >
-            {/* Wrapper Gambar Utama */}
-            <div
-              className="flex transition-transform duration-700 ease-in-out h-full w-full"
-              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-            >
-              {images.map((img, index) => (
-                <div
-                  key={index}
-                  // Shadow kustom bawah & kiri biru
-                  className="w-full h-full flex-shrink-0 bg-cover bg-center shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),-12px_0_15px_-3px_rgba(59,130,246,0.5)]"
-                  style={{ backgroundImage: `url(${img})` }}
-                />
-              ))}
+        {/* Hero Section */}
+        <section className="relative w-full h-[85vh] overflow-hidden group">
+          {isLoadingTrending ? (
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#1a0a2e] to-[#0d1b2a] flex items-center justify-center">
+              <div className="loading-spinner w-12 h-12" />
             </div>
-
-            {/* Tombol Slide Kiri */}
-            <button
-              onClick={prevSlide}
-              className="absolute top-1/2 left-5 -translate-y-1/2 bg-black/50 text-white p-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/80 z-10"
-            >
-              &#10094;
-            </button>
-
-            {/* Tombol Slide Kanan */}
-            <button
-              onClick={nextSlide}
-              className="absolute top-1/2 right-5 -translate-y-1/2 bg-black/50 text-white p-4 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/80 z-10"
-            >
-              &#10095;
-            </button>
-
-            {/* Indikator Titik Bawah (Dots) */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-3 z-10">
-              {images.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentIndex(index)}
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${currentIndex === index ? "bg-white scale-125" : "bg-white/50 hover:bg-white/80"
-                    }`}
-                />
-              ))}
+          ) : heroMovies.length === 0 ? (
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#1a0a2e] to-[#0d1b2a] flex items-center justify-center text-white text-lg">
+              Tidak ada film trending.
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="absolute inset-0">
+                {heroMovies.map((movie, index) => (
+                  <div
+                    key={movie.title + index}
+                    className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentIndex === index ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                      }`}
+                  >
+                    {movie.poster_url ? (
+                      <Image
+                        src={movie.poster_url}
+                        alt={movie.title}
+                        fill
+                        sizes="100vw"
+                        className="object-cover"
+                        priority={index === 0}
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#1a0a2e] to-[#0d1b2a]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0a1628] via-[#0a1628]/70 to-transparent z-10" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-transparent to-[#0a1628]/40 z-10" />
+                  </div>
+                ))}
+              </div>
+
+              {heroMovies[currentIndex] && (
+                <div className="absolute inset-0 z-20 flex items-center">
+                  <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+                    <motion.div
+                      key={currentIndex}
+                      initial={{ opacity: 0, x: -30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.6, ease: 'easeOut' }}
+                      className="max-w-2xl"
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        {heroMovies[currentIndex].imdb_score > 0 && (
+                          <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 px-3 py-1 rounded-lg">
+                            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                            <span className="text-sm font-bold text-amber-400">
+                              {formatIMDBScore(heroMovies[currentIndex].imdb_score)}
+                            </span>
+                          </div>
+                        )}
+                        {heroMovies[currentIndex].year && (
+                          <span className="text-sm font-semibold text-slate-300">
+                            {heroMovies[currentIndex].year}
+                          </span>
+                        )}
+                        {heroMovies[currentIndex].runtime && (
+                          <span className="text-sm text-slate-400">
+                            {Math.floor((heroMovies[currentIndex].runtime as number) / 60)}h {(heroMovies[currentIndex].runtime as number) % 60}m
+                          </span>
+                        )}
+                      </div>
+
+                      <h1 className="text-4xl md:text-6xl font-black text-white leading-tight mb-4 drop-shadow-2xl">
+                        {heroMovies[currentIndex].title}
+                      </h1>
+
+                      <div className="flex flex-wrap gap-2 mb-5">
+                        {parseGenres(heroMovies[currentIndex].genre).slice(0, 3).map((g) => (
+                          <span
+                            key={g}
+                            className="px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-white/10 border border-white/15 text-slate-200 backdrop-blur-sm"
+                          >
+                            {g}
+                          </span>
+                        ))}
+                      </div>
+
+                      {heroMovies[currentIndex].overview && (
+                        <p className="text-sm md:text-base text-slate-300/90 leading-relaxed mb-8 line-clamp-3 max-w-xl">
+                          {heroMovies[currentIndex].overview}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-4">
+                        <Link href={`/movie/${encodeMovieTitle(heroMovies[currentIndex].title)}`}>
+  <button className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-brand-300 hover:bg-brand-200 text-white font-bold text-sm transition-all shadow-lg shadow-brand-300/30 hover:shadow-brand-300/50 hover:scale-105">
+    <span className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center">
+      <span className="text-white font-serif font-bold text-xs italic leading-none">i</span>
+    </span>
+    Detail Film
+  </button>
+</Link>
+
+                        
+                      </div>
+                    </motion.div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={prevSlide}
+                className="absolute top-1/2 left-4 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 hover:scale-110"
+                aria-label="Previous Slide"
+              >
+                <ChevronLeft className="w-6 h-6 text-white" />
+              </button>
+              <button
+                onClick={nextSlide}
+                className="absolute top-1/2 right-4 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 hover:scale-110"
+                aria-label="Next Slide"
+              >
+                <ChevronRight className="w-6 h-6 text-white" />
+              </button>
+
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
+                {heroMovies.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentIndex(index)}
+                    className={`transition-all duration-300 rounded-full ${currentIndex === index
+                      ? 'w-8 h-2.5 bg-brand-300'
+                      : 'w-2.5 h-2.5 bg-white/30 hover:bg-white/50'
+                      }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+
+              <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a1628] to-transparent z-20 pointer-events-none" />
+            </>
+          )}
         </section>
 
         <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24">
-          {/* ERROR HANDLING */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -443,7 +503,6 @@ export default function Home() {
             </motion.div>
           )}
 
-          {/* TRENDING SECTION */}
           <section className="mb-16">
             <div className="flex items-center gap-2 mb-6">
               <TrendingUp className="w-8 h-8 text-brand-300" />
@@ -456,7 +515,6 @@ export default function Home() {
             {isLoadingTrending ? (
               <div className="flex gap-4 md:gap-6 overflow-hidden">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  // Skeleton disesuaikan dimensinya dengan Card asli
                   <div key={i} className="shrink-0 w-[290px] md:w-[340px] h-[180px] md:h-[220px] glass-panel rounded-2xl p-5 md:p-6 border border-white/5 flex flex-col justify-between">
                     <div className="space-y-4">
                       <div className="h-5 w-16 bg-white/5 rounded shimmer-bg" />
@@ -476,11 +534,8 @@ export default function Home() {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.06 }}
-                        /* PERUBAHAN UTAMA: Ditambahkan height h-[430px] md:h-[480px], relative, dan overflow-hidden */
                         className="shrink-0 w-[290px] md:w-[340px] h-[430px] md:h-[480px] glass-panel rounded-2xl cursor-pointer group border border-white/5 overflow-hidden relative flex flex-col justify-between"
                       >
-
-                        {/* 1. GAMBAR POSTER (FULL BACKROUND CARD) */}
                         {movie.poster_url && (
                           <div className="absolute inset-0 w-full h-full z-0">
                             <Image
@@ -489,21 +544,17 @@ export default function Home() {
                               fill
                               sizes="(max-width: 768px) 290px, 340px"
                               className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                              priority={idx < 2} // Mengoptimalkan LCP untuk item slider terdepan
+                              priority={idx < 2}
                             />
-                            {/* Color Bleed Gradient: Menghubungkan poster ke warna background gelap web kamu (#0A1628) */}
                             <div className="absolute inset-0 bg-gradient-to-t from-[#0A1628] via-[#0A1628]/50 to-transparent via-45% z-10 pointer-events-none" />
                           </div>
                         )}
 
-                        {/* 2. FLOATING HEADER BAR (Mengapung di Atas Poster) */}
                         <div className="absolute top-0 inset-x-0 p-5 md:p-6 z-20 flex items-center justify-between bg-gradient-to-b from-black/30 to-transparent pointer-events-none">
                           <div className="flex items-center gap-2 md:gap-3 pointer-events-auto">
-                            {/* Rank Badge dengan backdrop blur agar kontras */}
                             <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-[#0A1628]/60 backdrop-blur-md border border-brand-300/30 flex items-center justify-center text-xs font-black text-brand-300 shadow-md">
                               #{idx + 1}
                             </span>
-                            {/* Rating Badge */}
                             {movie.imdb_score > 0 && (
                               <div className="flex items-center gap-1 bg-[#0A1628]/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 shadow-md">
                                 <Star className="w-3 h-3 md:w-3.5 md:h-3.5 text-amber-400 fill-amber-400" />
@@ -513,18 +564,13 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-white/70 group-hover:text-brand-300 transition-colors group-hover:translate-x-1 transition-transform pointer-events-auto" />
+                          <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-white/70 group-hover:text-brand-300 transition-colors group-hover:translate-x-1 pointer-events-auto" />
                         </div>
 
-                        {/* 3. BOTTOM KONTEN (Judul & Metadata Meleleh di Bagian Bawah) */}
                         <div className="relative z-20 p-5 md:p-6 mt-auto w-full">
-
-                          {/* Title dengan efek text-glow bawaan CSS kamu */}
                           <h3 className="text-xl md:text-2xl font-black text-white group-hover:text-brand-300 transition-colors leading-tight mb-3 line-clamp-2 text-glow">
                             {movie.title}
                           </h3>
-
-                          {/* Tags (Genre & Year) menggunakan class .genre-pill agar seragam */}
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {genres.slice(0, 2).map((g) => (
                               <span
@@ -540,9 +586,7 @@ export default function Home() {
                               </span>
                             )}
                           </div>
-
                         </div>
-
                       </motion.div>
                     </Link>
                   );
@@ -551,7 +595,6 @@ export default function Home() {
             )}
           </section>
 
-          {/* GENRE SECTION */}
           <section className="mb-16">
             <div className="flex items-center gap-2 mb-6">
               <Sparkles className="w-8 h-8 text-brand-200" />
@@ -561,7 +604,6 @@ export default function Home() {
             <div className="flex flex-wrap gap-2 mb-6">
               <button
                 onClick={() => setSelectedGenre(null)}
-                // Padding tombol dikoreksi: kecil di mobile, sedikit lebih besar di desktop
                 className={`px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all border ${selectedGenre === null
                   ? 'bg-brand-300 text-white border-brand-300 shadow-lg shadow-brand-300/20'
                   : 'bg-white/[0.02] border-white/10 text-slate-400 hover:text-white hover:border-white/20'
@@ -617,7 +659,6 @@ export default function Home() {
             </AnimatePresence>
           </section>
 
-          {/* POPULAR MOVIES SECTION */}
           <section className="mb-16">
             <div className="flex items-center gap-2 mb-6">
               <Film className="w-10 h-10 text-brand-300" />
@@ -648,63 +689,23 @@ export default function Home() {
                   disabled={popularPage <= 1 || isLoadingPopular}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 bg-white/[0.03] border border-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
-                  ← Sebelumnya
+                  Sebelumnya
                 </button>
-
-                <div className="flex gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (popularPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (popularPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = popularPage - 2 + i;
-                    }
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => loadPopularMovies(pageNum)}
-                        disabled={isLoadingPopular}
-                        className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${popularPage === pageNum
-                          ? 'bg-brand-300 text-white shadow-lg shadow-brand-300/20'
-                          : 'text-slate-400 bg-white/[0.03] border border-white/10 hover:text-white hover:border-white/20'
-                          }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
+                <span className="px-4 py-2 rounded-xl text-xs font-bold text-brand-300 bg-brand-300/10 border border-brand-300/20">
+                  {popularPage}
+                </span>
                 <button
                   onClick={() => loadPopularMovies(popularPage + 1)}
                   disabled={popularPage >= totalPages || isLoadingPopular}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 bg-white/[0.03] border border-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
-                  Selanjutnya →
+                  Berikutnya
                 </button>
               </div>
             )}
           </section>
         </div>
       </main>
-
-      {/* FOOTER */}
-      <footer className="border-t border-white/5 py-8 bg-slate-950/30 backdrop-blur-md relative z-10 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-            <Film className="w-4 h-4 text-brand-300" />
-            <span>SmartMovie</span>
-            <span>•</span>
-            <span>Platform Film & Rekomendasi</span>
-          </div>
-          <HealthIndicator />
-          <div>&copy; {new Date().getFullYear()} SmartMovie. Semua hak cipta dilindungi.</div>
-        </div>
-      </footer>
     </div>
   );
 }

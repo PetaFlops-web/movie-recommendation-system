@@ -1,16 +1,8 @@
 import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse, Comment, UserProfile } from '@/types/movieType';
 import { getToken, removeToken } from './auth';
 
-// ============================================================
-// API Configuration — reads from .env (NEXT_PUBLIC_API_URL)
-// ============================================================
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API_BASE = `${API_BASE_URL}/api`;
-
-// ============================================================
-// Data Mapping Helpers
-// ============================================================
 
 function parseRating(value: unknown): number {
   if (value === undefined || value === null || value === '' || value === 'nan') return 0;
@@ -27,6 +19,11 @@ function parseRuntimeValue(value: unknown): number | undefined {
 }
 
 function mapMovie(raw: Record<string, unknown>): MovieFromAPI {
+  const posterPath = (raw.poster_path as string) || (raw.poster_url as string) || '';
+  const posterUrl = posterPath && posterPath !== 'null'
+    ? `https://image.tmdb.org/t/p/w500${posterPath}`
+    : undefined;
+
   return {
     movie_id: raw.movie_id as number | undefined,
     title: (raw.title as string) || 'Unknown',
@@ -39,7 +36,7 @@ function mapMovie(raw: Record<string, unknown>): MovieFromAPI {
     runtime: parseRuntimeValue(raw.runtime),
     language: (raw.language as string) || undefined,
     premiere: (raw.premiere as string) || undefined,
-    poster_url: (raw.poster_url as string) || undefined,
+    poster_url: posterUrl,
   };
 }
 
@@ -49,10 +46,6 @@ function mapRecommendation(raw: Record<string, unknown>): MovieWithSimilarity {
     similarity_score: parseRating(raw.similarity_score),
   };
 }
-
-// ============================================================
-// Fetch Helpers with Error Handling
-// ============================================================
 
 async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
   let res: Response;
@@ -94,10 +87,6 @@ async function safeJsonParse(res: Response): Promise<Record<string, unknown>> {
   return res.json();
 }
 
-// ============================================================
-// Movie API Functions (Public)
-// ============================================================
-
 export async function fetchMovies(
   page: number = 1,
   limit: number = 20,
@@ -125,9 +114,7 @@ export async function fetchMovies(
   const totalPages =
     pagination.pages ??
     (Math.ceil((pagination.total ?? rawMovies.length) / (pagination.limit || limit)) || 1);
-  console.log('API Response:', {
-    rawMovies,
-  });
+
   return {
     success: Boolean(json?.success),
     page: pagination.page ?? page,
@@ -158,7 +145,6 @@ export async function fetchMovieDetail(
         const json = await safeJsonParse(res) as Record<string, unknown>;
         const data = json?.data as Record<string, unknown> | undefined;
         const movie = mapMovie((data?.movie as Record<string, unknown>) || found);
-        console.log('Movie detail API response:', { data });
         const rawRecs = (data?.recommendations as Record<string, unknown[]>) || {};
         const recommendations = {
           hybrid: ((rawRecs.hybrid as Record<string, unknown>[]) || []).map(mapRecommendation),
@@ -171,7 +157,7 @@ export async function fetchMovieDetail(
         };
       }
     } catch {
-      // fallback to search data without recommendations
+      // fallback
     }
   }
 
@@ -181,10 +167,6 @@ export async function fetchMovieDetail(
     recommendations: { hybrid: [], tfidf: [] },
   };
 }
-
-// ============================================================
-// Profile API Functions
-// ============================================================
 
 export async function fetchProfile(userId: number): Promise<UserProfile> {
   const res = await safeFetch(`${API_BASE}/users/${userId}/profile`);
@@ -223,10 +205,6 @@ export async function deleteAccount(userId: number): Promise<void> {
   }
 }
 
-// ============================================================
-// Auth Preferences API Functions
-// ============================================================
-
 export async function getPreferences(): Promise<string[]> {
   const res = await authFetch(`${API_BASE}/auth/preferences`);
   if (!res.ok) {
@@ -252,10 +230,6 @@ export async function updatePreferences(genres: string[]): Promise<string[]> {
   const data = json?.data as Record<string, unknown> | undefined;
   return (data?.preferences as string[]) || (data?.genres as string[]) || genres;
 }
-
-// ============================================================
-// Social API Functions (Protected — requires Bearer token)
-// ============================================================
 
 export async function getComments(movieId: number): Promise<{ comments: Comment[]; total: number }> {
   const res = await safeFetch(`${API_BASE}/movies/${movieId}/comments`);
@@ -330,10 +304,6 @@ export async function shareMovie(
   const json = await safeJsonParse(res) as Record<string, unknown>;
   return json?.data as { shared: boolean; platform: string };
 }
-
-// ============================================================
-// Health Check API (Public)
-// ============================================================
 
 export interface HealthStatus {
   api: string;
