@@ -113,9 +113,10 @@ export default function MovieDetailPage() {
   const glowColor = "#00A9FF";
 
   // Scroll ref and handler for horizontal recommendations
-  const hybridScrollRef = useRef<HTMLDivElement>(null);
-  const tfidfScrollRef = useRef<HTMLDivElement>(null);
-  const scrollByAmount = (ref: React.RefObject<HTMLDivElement | null>, direction: "left" | "right") => {
+  const hybridScrollRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+  const tfidfScrollRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+
+  const scrollByAmount = (ref: React.RefObject<HTMLDivElement>, direction: "left" | "right") => {
     if (ref.current) {
       const amount = direction === "left" ? -360 : 360;
       ref.current.scrollBy({ left: amount, behavior: "smooth" });
@@ -480,7 +481,7 @@ export default function MovieDetailPage() {
             {(() => {
               const renderRecCarousel = (
                 items: MovieWithSimilarity[],
-                scrollRef: React.RefObject<HTMLDivElement | null>,
+                scrollRef: React.RefObject<HTMLDivElement>,
                 label: string,
                 description: string,
               ) => {
