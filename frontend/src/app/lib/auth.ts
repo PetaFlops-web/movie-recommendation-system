@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 const API_AUTH = `${API_BASE_URL}/api/auth`;
 
 const STORAGE_KEY = process.env.NEXT_PUBLIC_JWT_STORAGE_KEY || 'smartmovie_token';
