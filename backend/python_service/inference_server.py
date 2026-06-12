@@ -81,7 +81,9 @@ def load_and_process_data():
         
         # --- 1. Load df_processed.csv ---
         csv_path = os.path.join(model_dir, 'df_processed.csv')
-        if not os.path.exists(csv_path): return False
+        if not os.path.exists(csv_path):
+            logger.error(f"❌ df_processed.csv not found")
+            return False
         
         df_processed = pd.read_csv(csv_path, encoding='utf-8')
         column_mapping = {
@@ -93,45 +95,78 @@ def load_and_process_data():
         df_processed.rename(columns=existing_cols, inplace=True)
         
         for col in ['title', 'genres']:
-            if col not in df_processed.columns: df_processed[col] = ''
+            if col not in df_processed.columns:
+                df_processed[col] = ''
         df_processed.fillna('', inplace=True)
         if 'movie_id' not in df_processed.columns:
             df_processed['movie_id'] = range(1, len(df_processed) + 1)
         
+        logger.info(f"✅ Loaded {len(df_processed)} movies from CSV")
+        
         # --- 2. Load tfidf_vectorizer.pkl ---
         tfidf_path = os.path.join(model_dir, 'tfidf_vectorizer.pkl')
-        if not os.path.exists(tfidf_path): return False
+        if not os.path.exists(tfidf_path):
+            logger.error(f"❌ tfidf_vectorizer.pkl not found")
+            return False
         tfidf_vectorizer = joblib.load(tfidf_path)
+        logger.info(f"✅ TF-IDF Vectorizer loaded successfully")
         
         # --- 3. Load cosine_sim_matrix.pkl ---
         cosine_path = os.path.join(model_dir, 'cosine_sim_matrix.pkl')
-        if not os.path.exists(cosine_path): return False
+        if not os.path.exists(cosine_path):
+            logger.error(f"❌ cosine_sim_matrix.pkl not found")
+            return False
         
         logger.info(f"📥 Loading Cosine Similarity matrix...")
         cosine_sim_matrix = joblib.load(cosine_path)
         logger.info(f"✅ Cosine Similarity matrix loaded! Shape: {cosine_sim_matrix.shape}")
         
-        # --- 4. Load hybrid_recommender.pkl ---
-        # Jika nama file Anda 'hybrid_recommender.pkl', ubah teks di bawah ini.
-        hybrid_path = os.path.join(model_dir, 'hybrid_recommender.pkl') 
+        # --- 4. Load hybrid_recommender.pkl (WITH ERROR ISOLATION) ---
+        try:
+            hybrid_path = os.path.join(model_dir, 'hybrid_recommender.pkl') 
+            
+            if os.path.exists(hybrid_path):
+                logger.info(f"📥 Loading Hybrid Recommender Dictionary...")
+                hybrid_dict = joblib.load(hybrid_path)
+                
+                # Validasi struktur dictionary sebelum instantiate class
+                if 'similarity_matrix' in hybrid_dict and 'indices' in hybrid_dict:
+                    hybrid_recommender = HybridRecommenderInference(hybrid_dict, df_processed)
+                    logger.info(f"✅ Hybrid Recommender successfully loaded and mapped!")
+                else:
+                    logger.error(f"❌ Hybrid model missing required keys. Available keys: {list(hybrid_dict.keys()) if isinstance(hybrid_dict, dict) else 'Not a dict'}")
+                    logger.warning(f"⚠️ Hybrid recommendation will be disabled")
+                    hybrid_recommender = None
+            else:
+                logger.warning(f"⚠️ Hybrid model not found at {hybrid_path}. Hybrid route will be disabled.")
+                hybrid_recommender = None
+                
+        except Exception as e:
+            logger.error(f"❌ FAILED to load Hybrid Recommender: {str(e)}")
+            logger.warning(f"⚠️ Hybrid recommendation will be disabled, but core models will continue")
+            import traceback
+            logger.error(traceback.format_exc())
+            hybrid_recommender = None
         
-        if os.path.exists(hybrid_path):
-            logger.info(f"📥 Loading Hybrid Recommender Dictionary...")
-            hybrid_dict = joblib.load(hybrid_path)
-            hybrid_recommender = HybridRecommenderInference(hybrid_dict, df_processed)
-            logger.info(f"✅ Hybrid Recommender successfully loaded and mapped!")
+        # ✅ SUCCESS LOGIC: Anggap sukses jika core models (cosine) sudah ready
+        if cosine_sim_matrix is not None and df_processed is not None:
+            logger.info("=" * 60)
+            logger.info("✅ Core models (Cosine + TF-IDF) loaded successfully!")
+            logger.info(f"📊 Movies count: {len(df_processed)}")
+            logger.info(f"🔗 Cosine matrix shape: {cosine_sim_matrix.shape}")
+            logger.info(f"🤖 Hybrid recommender: {'READY' if hybrid_recommender is not None else 'DISABLED'}")
+            logger.info("=" * 60)
+            
+            models_loaded = True
+            return True
         else:
-            logger.warning(f"⚠️ Hybrid model not found at {hybrid_path}. Hybrid route will be disabled.")
-        
-        logger.info("=" * 60)
-        logger.info("✅ All models loaded successfully!")
-        logger.info("=" * 60)
-        
-        models_loaded = True
-        return True
-        
+            logger.error("❌ Critical failure: Core models not loaded")
+            return False
+            
     except Exception as e:
         logger.error(f"❌ Error loading models: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         models_loaded = False
         return False
 
@@ -139,7 +174,6 @@ def load_and_process_data():
 def health_check():
     """Health check endpoint - ALWAYS respond"""
     try:
-
         health_data = {
             'status': 'ok',
             'service': 'Movie Recommendation ML Service',
@@ -209,7 +243,6 @@ def recommend_content_based():
                     movie_idx = matched_rows.index[0]
                     logger.info(f"Found by partial title match: '{movie_title}' at index {movie_idx}")
                 else:
-                    # JANGAN langsung return 404 di sini, biarkan log mencatatnya saja
                     logger.warning(f"⚠️ Movie title not found in text match: '{movie_title}'. Trying ID fallback...")
         
         # Cari berdasarkan movie_id (jika title tidak ditemukan)
@@ -302,7 +335,6 @@ def recommend_hybrid():
 
         logger.info(f"🔍 Hybrid Request: title='{movie_title}', top_n={top_n}")
 
-        # Kita asumsikan hybrid_recommender memiliki method get_hybrid_recommendations
         result_df = hybrid_recommender.get_hybrid_recommendations(
             title=movie_title,
             top_n=top_n,
@@ -314,22 +346,20 @@ def recommend_hybrid():
         if result_df.empty:
             logger.warning(f"⚠️ No hybrid recommendations passed the threshold for '{movie_title}'")
             return jsonify({
-                'success': True, # Ubah jadi True karena eksekusi ML sukses, hanya saja hasilnya 0
+                'success': True,
                 'input': {
                     'movie_title': movie_title,
                     'requested_count': top_n,
                     'genre_filter': genre_filter
                 },
                 'message': f'No recommendations found for {movie_title}',
-                'recommendations': [], # Array kosong akan ditangkap dengan aman oleh Node.js
+                'recommendations': [],
                 'total_found': 0
             }), 200
 
-        # Format DataFrame hasil hybrid menjadi List of Dictionaries
         recommendations = []
         for _, row in result_df.iterrows():
             recommendations.append({
-                # 💡 Tambahkan movieId di sini agar Node.js bisa mencari posternya
                 'movieId': int(row['movie_id']) if 'movie_id' in row else None,
                 'title': str(row.get('Title', '')),
                 'genres': str(row.get('Genre', '')),
@@ -455,7 +485,7 @@ def before_first_request():
     global df_processed, cosine_sim_matrix
     
     if df_processed is None or cosine_sim_matrix is None:
-        logger.info(" Initializing ML models...")
+        logger.info("🔄 Initializing ML models...")
         if not load_and_process_data():
             logger.error("Failed to load models. Service may not work properly.")
 
@@ -504,4 +534,3 @@ if __name__ == '__main__':
         logger.error(traceback.format_exc())
         print(f"❌ Fatal error during startup: {str(e)}", flush=True)
         sys.exit(1)
-
