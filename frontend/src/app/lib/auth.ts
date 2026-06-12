@@ -5,8 +5,6 @@ const STORAGE_KEY = process.env.NEXT_PUBLIC_JWT_STORAGE_KEY || 'smartmovie_token
 const USER_STORAGE_KEY = `${STORAGE_KEY}_user`;
 const PREFS_STORAGE_KEY = `${STORAGE_KEY}_preferences`;
 
-
-
 export interface User {
   id: number;
   username: string;
@@ -29,10 +27,12 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string): void {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, token);
 }
 
 export function removeToken(): void {
+  if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(USER_STORAGE_KEY);
   localStorage.removeItem(PREFS_STORAGE_KEY);
@@ -62,8 +62,10 @@ export function getSavedPreferences(): string[] {
 
 export function saveAuth(data: AuthResponse['data']): void {
   setToken(data.token);
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
-  localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(data.preferences));
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(data.preferences));
+  }
 }
 
 export function updateStoredUser(updates: Partial<User>): User | null {
@@ -144,6 +146,9 @@ export async function login(
   if (!res.ok) {
     throw new Error(json?.message || 'Login gagal');
   }
+
+  // ✅ FIX: SIMPAN TOKEN & DATA USER KE LOCALSTORAGE AGAR AUTO-AUTH
+  saveAuth(json.data);
 
   return json;
 }
