@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = 'https://movie-recommendation-system-production-d4f9.up.railway.app';
 const API_AUTH = `${API_BASE_URL}/api/auth`;
 
 const STORAGE_KEY = process.env.NEXT_PUBLIC_JWT_STORAGE_KEY || 'smartmovie_token';
