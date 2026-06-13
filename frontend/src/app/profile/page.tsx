@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Film,
   ArrowLeft,
   User as UserIcon,
   Mail,
@@ -176,11 +175,8 @@ export default function ProfilePage() {
 
       {/* Header */}
       <header className="sticky top-0 z-50 w-full glass-panel border-b border-white/5 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
+        <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 md:gap-6">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-300 to-brand-200 flex items-center justify-center shadow-lg shadow-brand-300/20">
-              <Film className="w-5 h-5 text-white" />
-            </div>
             <span className="font-bold text-xl tracking-tight text-white">
               Smart<span className="text-brand-300 font-extrabold">Movie</span>
             </span>

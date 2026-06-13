@@ -187,7 +187,7 @@ export default function MovieDetailPage() {
           <div className="flex items-center gap-3 shrink-0">
             <div>
               <span className="font-bold text-lg md:text-3xl tracking-tight text-white">
-                Smart<span className="text-brand-300 font-extrabold">Movie</span>
+                <Link href="/">Smart<span className="text-brand-300 font-extrabold">Movie</span></Link>
               </span>
               <span className="hidden sm:block text-[10px] text-slate-400 tracking-widest uppercase font-semibold">
                 Sistem Rekomendasi

@@ -12,7 +12,6 @@ import {
   Star,
   AlertCircle,
   ChevronRight,
-  ChevronLeft,
   X,
   LogOut,
   Sparkles
@@ -102,9 +101,7 @@ export default function Home() {
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % heroMovies.length);
   }, [heroMovies.length]);
-  const prevSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + heroMovies.length) % heroMovies.length);
-  }, [heroMovies.length]);
+
 
 
 
@@ -244,7 +241,7 @@ export default function Home() {
         <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3 md:gap-6">
           <div className="flex items-center gap-3 shrink-0">
             <span className="font-bold text-lg md:text-3xl tracking-tight text-white">
-              Smart<span className="text-brand-300 font-extrabold">Movie</span>
+              <Link href="/">Smart<span className="text-brand-300 font-extrabold">Movie</span></Link>
             </span>
             <span className="hidden sm:block text-[10px] text-slate-400 tracking-widest uppercase font-semibold">
               Sistem Rekomendasi
@@ -484,21 +481,6 @@ export default function Home() {
                   </div>
                 </div>
               )}
-
-              <button
-                onClick={prevSlide}
-                className="absolute top-1/2 left-4 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 hover:scale-110"
-                aria-label="Previous Slide"
-              >
-                <ChevronLeft className="w-6 h-6 text-white" />
-              </button>
-              <button
-                onClick={nextSlide}
-                className="absolute top-1/2 right-4 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 hover:scale-110"
-                aria-label="Next Slide"
-              >
-                <ChevronRight className="w-6 h-6 text-white" />
-              </button>
 
               <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
                 {heroMovies.map((_, index) => (
