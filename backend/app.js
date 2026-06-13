@@ -56,11 +56,9 @@ app.use('/api/movies', movieRoutes);
 app.use('/api/health', healthRoutes);
 
 
-// ✅ TAMBAHKAN ROUTES BARU INI:
 app.use('/api/users', profileRoutes);   // Profile: GET/PUT /api/users/:userId/profile
 app.use('/api', socialRoutes);          // Social: POST/GET /api/movies/:id/comments, /like, /share
 
-// === 🏠 ROOT ENDPOINT ===
 
 
 app.get('/', (req, res) => {
