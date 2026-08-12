@@ -2,7 +2,9 @@ import { MovieFromAPI, MovieWithSimilarity, MoviesResponse, MovieDetailResponse,
 import { getToken, removeToken } from './auth';
 
 
-const API_BASE_URL = 'https://movie-recommendation-system-production-d4f9.up.railway.app';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 const API_BASE = `${API_BASE_URL}/api`;
 
 console.log('API_BASE set to:', API_BASE);
